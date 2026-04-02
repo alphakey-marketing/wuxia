@@ -2,16 +2,16 @@ export function generateNodeMap() {
   const nodes = [
     // Phase 1
     { id: 0, type: 'combat', phase: 1, label: 'Road Ambush', x: 0, y: 0 },
-    { id: 1, type: Math.random() < 0.5 ? 'event' : 'healer', phase: 1, label: Math.random() < 0.5 ? 'Crossroads Event' : 'Village Healer', x: 1, y: 0 },
+    { id: 1, ...(() => { const r = Math.random() < 0.5; return { type: r ? 'event' : 'healer', label: r ? 'Crossroads Event' : 'Village Healer' }; })(), phase: 1, x: 1, y: 0 },
     { id: 2, type: 'combat', phase: 1, label: 'Border Fight', x: 2, y: 0, fork: true },
     // Phase 2
     { id: 3, type: 'elite', phase: 2, label: 'Elite Encounter', x: 3, y: 0 },
-    { id: 4, type: Math.random() < 0.6 ? 'wanderingMaster' : 'sectTrial', phase: 2, label: Math.random() < 0.6 ? 'Wandering Master' : 'Sect Trial', x: 4, y: 0 },
+    { id: 4, ...(() => { const r = Math.random() < 0.6; return { type: r ? 'wanderingMaster' : 'sectTrial', label: r ? 'Wandering Master' : 'Sect Trial' }; })(), phase: 2, x: 4, y: 0 },
     { id: 5, type: 'elite', phase: 2, label: 'Elite Encounter', x: 5, y: 0 },
-    { id: 6, type: Math.random() < 0.5 ? 'hiddenCave' : 'ambush', phase: 2, label: Math.random() < 0.5 ? 'Forbidden Cave' : 'Mountain Ambush', x: 6, y: 0, fork: true },
+    { id: 6, ...(() => { const r = Math.random() < 0.5; return { type: r ? 'hiddenCave' : 'ambush', label: r ? 'Forbidden Cave' : 'Mountain Ambush' }; })(), phase: 2, x: 6, y: 0, fork: true },
     // Phase 3
     { id: 7, type: 'majorEvent', phase: 3, label: 'Jianghu Crossroads', x: 7, y: 0 },
-    { id: 8, type: Math.random() < 0.5 ? 'healer' : 'manualPage', phase: 3, label: Math.random() < 0.5 ? 'Mountain Healer' : 'Ancient Manual', x: 8, y: 0 },
+    { id: 8, ...(() => { const r = Math.random() < 0.5; return { type: r ? 'healer' : 'manualPage', label: r ? 'Mountain Healer' : 'Ancient Manual' }; })(), phase: 3, x: 8, y: 0 },
     { id: 9, type: 'boss', phase: 3, label: 'Final Confrontation', x: 9, y: 0 }
   ];
   return nodes;
