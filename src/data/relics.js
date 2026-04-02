@@ -1,0 +1,22 @@
+export const RELICS = {
+  R01: { id:'R01', name:"Jade Carp Carving", type:'Defensive', description:'Start with +25 HP max', tags:[] },
+  R02: { id:'R02', name:"Iron Grip Rings", type:'Offensive', description:'Basic attacks deal +8% damage', tags:[] },
+  R03: { id:'R03', name:"Cracked Moon Mirror", type:'Utility', description:'See all node rewards before choosing path', tags:[] },
+  R04: { id:'R04', name:"Widow's Tear Pendant", type:'Sustain', description:'Restore 3 HP per kill', tags:[] },
+  R05: { id:'R05', name:"Black Bone Fan", type:'Offensive', description:'Each dodge within a fight increases next skill damage by 10% (up to +50%)', tags:[] },
+  R06: { id:'R06', name:"Vengeful Ribbon", type:'Counter', description:'On taking damage below 30% HP, next attack deals 3× damage', tags:[] },
+  R07: { id:'R07', name:"Scholar's Inkbrush", type:'Technique', description:'Technique drafts always include 1 rare/manual technique', tags:[] },
+  R08: { id:'R08', name:"Bandit Leader's Ring", type:'Economy', description:'+30% silver from combat', tags:[] },
+  R09: { id:'R09', name:"Frostglass Bangle", type:'Frost', description:'Frozen enemies take +25% damage from all sources', tags:['Frost'] },
+  R10: { id:'R10', name:"Crimson Talisman", type:'Fire', description:'Burning Meridian stacks cap raised to +45% Attack', tags:['Fire'] },
+  R11: { id:'R11', name:"Empty Hand Bell", type:'Counter', description:'Counter-attacks have +30% crit chance', tags:['Counter'] },
+  R12: { id:'R12', name:"River Willow Flute", type:'Sustain', description:'At fight start, heal 10% max HP', tags:[] },
+  R13: { id:'R13', name:"Bloodstained Manual Page", type:'Manual', description:'Earn +10 Legacy Essence per elite defeated', tags:[] },
+  R14: { id:'R14', name:"Stolen Temple Bell", type:'AoE', description:'Ultimate hits also stun nearby enemies for 0.5s', tags:['AoE'] },
+  R15: { id:'R15', name:"Assassin's Coal Dust", type:'Shadow', description:'Dash leaves a smoke cloud that blinds enemies for 2s', tags:['Shadow'] },
+  R16: { id:'R16', name:"Thunder Bead Necklace", type:'Thunder', description:"Every 5th hit chains lightning to 2 enemies (30% weapon damage)", tags:['Thunder'] },
+  R17: { id:'R17', name:"Mountain Root Staff Ring", type:'Pierce', description:'Spear thrust range +40%', tags:['Pierce'] },
+  R18: { id:'R18', name:"Fox Spirit Charm", type:'Utility', description:'Once per run: avoid lethal damage (survive at 1 HP)', tags:[] },
+  R19: { id:'R19', name:"Drunken God's Flask", type:'Utility', description:'After each node: 50% chance to find a free healing item', tags:[] },
+  R20: { id:'R20', name:"Heaven and Earth Diagram", type:'Meta', description:'At life end: inherit 1 extra technique as a memory seal', tags:[] }
+};
