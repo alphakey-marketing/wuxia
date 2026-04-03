@@ -18,6 +18,7 @@ export class CombatScene extends Phaser.Scene {
     this.enemyAttackTimer = null;
     this.autoAttackTimer = null;
     this.onCombatEnd = null;
+    this.combatEnded = false;
     this.hitCount = 0;
     // Build
     this.weapon = null;
@@ -71,6 +72,7 @@ export class CombatScene extends Phaser.Scene {
     this.enemyMaxHp = this.enemyData.hp;
     this.enemyAttack = this.enemyData.attack;
     this.onCombatEnd = data.onCombatEnd;
+    this.combatEnded = false;
     this.weapon = data.weapon || null;
     this.innerArt = data.innerArt || null;
     this.movementArt = data.movementArt || null;
@@ -842,6 +844,9 @@ export class CombatScene extends Phaser.Scene {
   }
 
   handleVictory() {
+    // Guard: prevent multiple invocations from concurrent delayed hits (e.g. bloodWolf Skill 2)
+    if (this.combatEnded) return;
+    this.combatEnded = true;
     if (this.autoAttackTimer) this.autoAttackTimer.remove();
     if (this.enemyAttackTimer) this.enemyAttackTimer.remove();
     const W = this.scale.width;
@@ -892,6 +897,9 @@ export class CombatScene extends Phaser.Scene {
   }
 
   handleDefeat() {
+    // Guard: prevent multiple invocations (mirrors handleVictory guard)
+    if (this.combatEnded) return;
+    this.combatEnded = true;
     if (this.autoAttackTimer) this.autoAttackTimer.remove();
     if (this.enemyAttackTimer) this.enemyAttackTimer.remove();
     const W = this.scale.width;

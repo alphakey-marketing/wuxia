@@ -91,6 +91,8 @@ export default function PhaserGame({ enemy, playerStats, weapon, innerArt, movem
   const sceneRef = useRef(null);
   const onCombatEndRef = useRef(onCombatEnd);
   useEffect(() => { onCombatEndRef.current = onCombatEnd; }, [onCombatEnd]);
+  const playerStatsRef = useRef(playerStats);
+  useEffect(() => { playerStatsRef.current = playerStats; }, [playerStats]);
   const [cooldowns, setCooldowns] = useState({ skill1: 0, skill1Max: 5, skill2: 0, skill2Max: 8, ultimate: 0, ultimateMax: 10, dash: 0, dashMax: 3, burningStacks: 0, interruptWindow: false });
   const [combatStats, setCombatStats] = useState({ playerQi: 0, playerMaxQi: 100 });
   const [pendingBossResult, setPendingBossResult] = useState(null);
@@ -117,9 +119,9 @@ export default function PhaserGame({ enemy, playerStats, weapon, innerArt, movem
     game.events.on('cooldownUpdate', (data) => setCooldowns(data));
     game.events.on('statsUpdate', (data) => setCombatStats(data));
 
-    // Boss karma dialogue intercept
+    // Boss karma dialogue intercept — use ref to avoid stale closure
     game.events.on('bossDefeated', (result) => {
-      const karma = playerStats?.karma || {};
+      const karma = playerStatsRef.current?.karma || {};
       // B01: mercy ≥ 2 opens spare dialogue
       if (result.bossId === 'B01' && (karma.mercy || 0) >= 2) {
         setPendingBossResult(result);
@@ -135,6 +137,18 @@ export default function PhaserGame({ enemy, playerStats, weapon, innerArt, movem
     game.events.once('ready', () => {
       const scene = game.scene.getScene('CombatScene');
       sceneRef.current = scene;
+
+      // Bug 1 fix: pass the real callback in the start data so CombatScene.init()
+      // stores it correctly. Assigning scene.onCombatEnd after scene.start() would
+      // be immediately overwritten by init() which runs synchronously.
+      const handleResult = (result) => {
+        if (!result.bossId) {
+          game.destroy(true);
+          onCombatEndRef.current(result);
+        }
+        // Boss victories handled via bossDefeated event above
+      };
+
       scene.scene.start('CombatScene', {
         playerHp: playerStats.hp,
         playerMaxHp: playerStats.maxHp,
@@ -152,16 +166,8 @@ export default function PhaserGame({ enemy, playerStats, weapon, innerArt, movem
         activeSynergies,
         burningMeridianStacks: burningMeridianStacks || 0,
         karma: playerStats?.karma || {},
-        onCombatEnd: null  // not used — bossDefeated event handles boss; non-boss uses onCombatEnd directly
+        onCombatEnd: handleResult
       });
-      // Wire non-boss onCombatEnd for standard/elite victories
-      scene.onCombatEnd = (result) => {
-        if (!result.bossId) {
-          game.destroy(true);
-          onCombatEndRef.current(result);
-        }
-        // Boss victories handled via bossDefeated event
-      };
     });
 
     return () => {

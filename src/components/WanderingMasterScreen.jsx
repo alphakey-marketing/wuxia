@@ -101,7 +101,7 @@ export default function WanderingMasterScreen() {
   const [choice, setChoice] = useState(null);
   const [narrative] = useState(() => MASTER_NARRATIVES[Math.floor(Math.random() * MASTER_NARRATIVES.length)]);
 
-  const canLearnFree = runState.techniques.length < 6;
+  const canLearnFree = runState.techniques.length < (runState.maxTechniques || 6);
   const isOrthodox = runState.karma.orthodoxy >= 0;
 
   const handleLearnFree = (tech) => {
