@@ -136,7 +136,7 @@ export default function WanderingMasterScreen() {
         <div style={S.subtitle}>Choose what you wish to learn</div>
         {!canLearnFree && (
           <div style={{ ...S.narrative, background: '#2a1a1a', border: '1px solid #8b1a1a44' }}>
-            "Your mind is already full," the master says. "You cannot hold another technique until you have mastered what you carry." (Max 6 techniques equipped)
+            "Your mind is already full," the master says. "You cannot hold another technique until you have mastered what you carry." (Max {runState.maxTechniques || 6} techniques equipped)
           </div>
         )}
         <div style={S.techGrid}>

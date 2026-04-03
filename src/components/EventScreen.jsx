@@ -84,8 +84,9 @@ export default function EventScreen() {
 
   const handleChoice = (choice) => {
     const outcome = { ...choice.outcome };
-    // Apply karma requirement check — requiresKarma lives inside outcome in the events data
-    const karmaReq = choice.outcome?.requiresKarma;
+    // Karma requirement can be inside outcome.requiresKarma (E_FORBIDDEN_CAVE)
+    // or at top-level choice.karmaRequirement (E_SECT_TRIAL)
+    const karmaReq = choice.outcome?.requiresKarma || choice.karmaRequirement;
     if (karmaReq && runState?.karma) {
       const meetsReq = Object.entries(karmaReq).every(
         ([axis, minVal]) => (runState.karma[axis] || 0) >= minVal
@@ -108,7 +109,7 @@ export default function EventScreen() {
         <p style={S.description}>{event.description}</p>
         <div style={S.choices}>
           {event.choices.map((choice, i) => {
-            const karmaReq = choice.outcome?.requiresKarma;
+            const karmaReq = choice.outcome?.requiresKarma || choice.karmaRequirement;
             const meetsKarma = !karmaReq || !runState?.karma || Object.entries(karmaReq).every(
               ([axis, minVal]) => (runState.karma[axis] || 0) >= minVal
             );

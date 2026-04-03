@@ -169,7 +169,9 @@ function gameReducer(state, action) {
       if (node.type === 'combat' || node.type === 'elite' || node.type === 'boss' || node.type === 'ambush') {
         gamePhase = 'combat';
         currentEnemy = generateEnemy(node.type, state.runState, state.metaState);
-      } else if (node.type === 'event' || node.type === 'majorEvent' || node.type === 'wanderingMaster' || node.type === 'sectTrial' || node.type === 'hiddenCave') {
+      } else if (node.type === 'wanderingMaster') {
+        gamePhase = 'wanderingMaster';
+      } else if (node.type === 'event' || node.type === 'majorEvent' || node.type === 'sectTrial' || node.type === 'hiddenCave') {
         gamePhase = 'event';
         pendingEvent = selectEvent(node.type, state.runState, state.metaState);
       } else if (node.type === 'healer') {
@@ -203,7 +205,9 @@ function gameReducer(state, action) {
       if (chosenBranch.type === 'combat' || chosenBranch.type === 'elite' || chosenBranch.type === 'boss' || chosenBranch.type === 'ambush') {
         gamePhase = 'combat';
         currentEnemy = generateEnemy(chosenBranch.type, newRunState, state.metaState);
-      } else if (chosenBranch.type === 'event' || chosenBranch.type === 'majorEvent' || chosenBranch.type === 'wanderingMaster' || chosenBranch.type === 'sectTrial' || chosenBranch.type === 'hiddenCave') {
+      } else if (chosenBranch.type === 'wanderingMaster') {
+        gamePhase = 'wanderingMaster';
+      } else if (chosenBranch.type === 'event' || chosenBranch.type === 'majorEvent' || chosenBranch.type === 'sectTrial' || chosenBranch.type === 'hiddenCave') {
         gamePhase = 'event';
         pendingEvent = selectEvent(chosenBranch.type, newRunState, state.metaState);
       } else if (chosenBranch.type === 'healer') {
@@ -259,35 +263,54 @@ function gameReducer(state, action) {
       const { outcome } = action.payload;
       let newRunState = { ...state.runState };
       const maxTech = newRunState.maxTechniques || 6;
-      if (outcome.healHp) newRunState.hp = Math.min(newRunState.maxHp, newRunState.hp + outcome.healHp);
-      if (outcome.hpMax) newRunState.maxHp = newRunState.maxHp + outcome.hpMax;
-      if (outcome.hpLoss) newRunState.hp = Math.max(1, newRunState.hp - outcome.hpLoss);
-      if (outcome.silver) newRunState.silver = newRunState.silver + outcome.silver;
-      if (outcome.essence) newRunState.legacyEssence = newRunState.legacyEssence + outcome.essence;
-      if (outcome.karma) {
-        newRunState.karma = { ...newRunState.karma };
-        Object.entries(outcome.karma).forEach(([k, v]) => { newRunState.karma[k] = (newRunState.karma[k] || 0) + v; });
+      // Handle random outcome for E_GHOST_STORY
+      let resolvedOutcome = outcome;
+      if (outcome.random) {
+        const allTechs = Object.values(TECHNIQUES).filter(t => !newRunState.techniques.find(tt => tt.id === t.id) && t.category !== 'rare');
+        const allRelics = Object.values(RELICS).filter(r => !newRunState.relics.find(rr => rr.id === r.id));
+        const roll = Math.random();
+        if (roll < 0.33 && allTechs.length > 0) {
+          const tech = allTechs[Math.floor(Math.random() * allTechs.length)];
+          resolvedOutcome = { technique: tech.id };
+        } else if (roll < 0.66 && allRelics.length > 0 && newRunState.relics.length < 4) {
+          const relic = allRelics[Math.floor(Math.random() * allRelics.length)];
+          resolvedOutcome = { relic: relic.id };
+        } else {
+          resolvedOutcome = { hpLoss: 30 };
+        }
       }
-      if (outcome.technique) {
-        const tech = TECHNIQUES[outcome.technique];
+      if (resolvedOutcome.healHp) newRunState.hp = Math.min(newRunState.maxHp, newRunState.hp + resolvedOutcome.healHp);
+      if (resolvedOutcome.hpMax) newRunState.maxHp = newRunState.maxHp + resolvedOutcome.hpMax;
+      if (resolvedOutcome.hpLoss) newRunState.hp = Math.max(1, newRunState.hp - resolvedOutcome.hpLoss);
+      if (resolvedOutcome.silver) newRunState.silver = newRunState.silver + resolvedOutcome.silver;
+      if (resolvedOutcome.essence) newRunState.legacyEssence = newRunState.legacyEssence + resolvedOutcome.essence;
+      if (resolvedOutcome.karma) {
+        newRunState.karma = { ...newRunState.karma };
+        Object.entries(resolvedOutcome.karma).forEach(([k, v]) => { newRunState.karma[k] = (newRunState.karma[k] || 0) + v; });
+      }
+      if (resolvedOutcome.technique) {
+        const tech = TECHNIQUES[resolvedOutcome.technique];
         if (tech && !newRunState.techniques.find(t => t.id === tech.id) && newRunState.techniques.length < maxTech) {
           newRunState.techniques = [...newRunState.techniques, tech];
         }
       }
-      if (outcome.relic) {
-        const relic = RELICS[outcome.relic];
+      if (resolvedOutcome.relic) {
+        const relic = RELICS[resolvedOutcome.relic];
         if (relic && !newRunState.relics.find(r => r.id === relic.id) && newRunState.relics.length < 4) {
           newRunState.relics = [...newRunState.relics, relic];
         }
       }
-      if (outcome.techniqueShard) {
+      if (resolvedOutcome.techniqueShard) {
         newRunState.techniqueShards = (newRunState.techniqueShards || 0) + 1;
       }
-      if (outcome.memorySeal) {
-        newRunState.run_flags = { ...newRunState.run_flags, latestMemorySeal: outcome.memorySeal };
+      if (resolvedOutcome.memorySeal) {
+        newRunState.run_flags = { ...newRunState.run_flags, latestMemorySeal: resolvedOutcome.memorySeal };
+      }
+      if (resolvedOutcome.flag) {
+        newRunState.run_flags = { ...newRunState.run_flags, [resolvedOutcome.flag]: true };
       }
       // shop outcome: route to blackMarket screen instead of returning to the map
-      if (outcome.shop) {
+      if (resolvedOutcome.shop) {
         return { ...state, runState: newRunState, gamePhase: 'blackMarket', pendingEvent: null };
       }
       return { ...state, runState: newRunState, gamePhase: 'nodeMap', pendingEvent: null };

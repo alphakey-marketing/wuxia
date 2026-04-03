@@ -24,7 +24,7 @@ export const EVENTS = [
     name: 'The Sect Invitation',
     description: 'The Black Cliff Manor offers you membership — protection, resources, and a powerful relic. But they demand you report all wandering masters you encounter.',
     choices: [
-      { text: 'Accept', outcome: { relic: 'R01', karma: { honor: -1 }, note: 'Wandering Master events become hostile' } },
+      { text: 'Accept', outcome: { relic: 'R01', karma: { honor: -1 }, flag: 'joined_black_cliff', note: 'Wandering Master events become hostile' } },
       { text: 'Decline politely', outcome: {} },
       { text: 'Decline and warn masters', outcome: { karma: { honor: 1, renown: 1 }, note: 'Black Cliff becomes rival faction' } }
     ]
@@ -34,7 +34,7 @@ export const EVENTS = [
     name: 'The Forbidden Cave',
     description: 'A sealed cave bears a warning: the cultivation method inside drives practitioners to madness.',
     choices: [
-      { text: 'Enter (requires Unorthodox ≥ 0)', outcome: { technique: 'T18', karma: { orthodoxy: -2 }, hpMax: -20, requiresKarma: { orthodoxy: 0 } } },
+      { text: 'Enter (requires Unorthodox ≥ 0)', outcome: { technique: 'T18', karma: { orthodoxy: -2 }, hpMax: -20, requiresKarma: { orthodoxy: 0 }, flag: 'entered_forbidden_cave' } },
       { text: 'Seal it further', outcome: { karma: { orthodoxy: 1 }, essence: 15 } },
       { text: 'Mark it for the Archive', outcome: { memorySeal: "Location of the Madman's Cave", note: '+1 forbidden relic next run' } }
     ]

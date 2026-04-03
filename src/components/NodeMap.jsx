@@ -143,7 +143,7 @@ export default function NodeMap() {
         {node.branches.map((branch, bi) => {
           const isChosen = chosenBranch === bi;
           const isLocked = chosenBranch !== undefined && chosenBranch !== bi;
-          const canClick = forkTravelable && !isCurrent(nodeIdx) && chosenBranch === undefined;
+          const canClick = forkTravelable && isCurrent(nodeIdx) && chosenBranch === undefined;
           return (
             <div
               key={bi}
