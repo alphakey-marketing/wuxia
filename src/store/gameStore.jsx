@@ -3,6 +3,7 @@ import { WEAPONS } from '../data/weapons.js';
 import { INNER_ARTS } from '../data/innerArts.js';
 import { MOVEMENT_ARTS } from '../data/movementArts.js';
 import { RELICS } from '../data/relics.js';
+import { TECHNIQUES } from '../data/techniques.js';
 import { generateNodeMap } from '../utils/nodeMap.js';
 import { ENEMIES, BOSSES } from '../data/enemies.js';
 import { EVENTS } from '../data/events.js';
@@ -33,6 +34,7 @@ const DEFAULT_RUN_STATE = {
   qiBreakthroughs: 0,
   burningMeridianStacks: 0,
   run_flags: {},
+  techniqueShards: 0,
   activeSynergies: [],
   stancePoints: 0,
   frozenHeartCooldown: 0,
@@ -166,7 +168,7 @@ function gameReducer(state, action) {
       }
       if (node.type === 'combat' || node.type === 'elite' || node.type === 'boss' || node.type === 'ambush') {
         gamePhase = 'combat';
-        currentEnemy = generateEnemy(node.type, state.runState);
+        currentEnemy = generateEnemy(node.type, state.runState, state.metaState);
       } else if (node.type === 'event' || node.type === 'majorEvent' || node.type === 'wanderingMaster' || node.type === 'sectTrial' || node.type === 'hiddenCave') {
         gamePhase = 'event';
         pendingEvent = selectEvent(node.type, state.runState, state.metaState);
@@ -200,7 +202,7 @@ function gameReducer(state, action) {
       let pendingEvent = null;
       if (chosenBranch.type === 'combat' || chosenBranch.type === 'elite' || chosenBranch.type === 'boss' || chosenBranch.type === 'ambush') {
         gamePhase = 'combat';
-        currentEnemy = generateEnemy(chosenBranch.type, newRunState);
+        currentEnemy = generateEnemy(chosenBranch.type, newRunState, state.metaState);
       } else if (chosenBranch.type === 'event' || chosenBranch.type === 'majorEvent' || chosenBranch.type === 'wanderingMaster' || chosenBranch.type === 'sectTrial' || chosenBranch.type === 'hiddenCave') {
         gamePhase = 'event';
         pendingEvent = selectEvent(chosenBranch.type, newRunState, state.metaState);
@@ -256,6 +258,7 @@ function gameReducer(state, action) {
     case 'COMPLETE_EVENT': {
       const { outcome } = action.payload;
       let newRunState = { ...state.runState };
+      const maxTech = newRunState.maxTechniques || 6;
       if (outcome.healHp) newRunState.hp = Math.min(newRunState.maxHp, newRunState.hp + outcome.healHp);
       if (outcome.hpMax) newRunState.maxHp = newRunState.maxHp + outcome.hpMax;
       if (outcome.hpLoss) newRunState.hp = Math.max(1, newRunState.hp - outcome.hpLoss);
@@ -264,6 +267,28 @@ function gameReducer(state, action) {
       if (outcome.karma) {
         newRunState.karma = { ...newRunState.karma };
         Object.entries(outcome.karma).forEach(([k, v]) => { newRunState.karma[k] = (newRunState.karma[k] || 0) + v; });
+      }
+      if (outcome.technique) {
+        const tech = TECHNIQUES[outcome.technique];
+        if (tech && !newRunState.techniques.find(t => t.id === tech.id) && newRunState.techniques.length < maxTech) {
+          newRunState.techniques = [...newRunState.techniques, tech];
+        }
+      }
+      if (outcome.relic) {
+        const relic = RELICS[outcome.relic];
+        if (relic && !newRunState.relics.find(r => r.id === relic.id) && newRunState.relics.length < 4) {
+          newRunState.relics = [...newRunState.relics, relic];
+        }
+      }
+      if (outcome.techniqueShard) {
+        newRunState.techniqueShards = (newRunState.techniqueShards || 0) + 1;
+      }
+      if (outcome.memorySeal) {
+        newRunState.run_flags = { ...newRunState.run_flags, latestMemorySeal: outcome.memorySeal };
+      }
+      // shop outcome: route to blackMarket screen instead of returning to the map
+      if (outcome.shop) {
+        return { ...state, runState: newRunState, gamePhase: 'blackMarket', pendingEvent: null };
       }
       return { ...state, runState: newRunState, gamePhase: 'nodeMap', pendingEvent: null };
     }
@@ -418,7 +443,7 @@ function gameReducer(state, action) {
   }
 }
 
-function generateEnemy(nodeType, runState) {
+function generateEnemy(nodeType, runState, metaState) {
   // Phase-based difficulty multipliers
   const node = runState.currentNode || 0;
   let hpMult = 1.0;
@@ -427,7 +452,7 @@ function generateEnemy(nodeType, runState) {
   else if (node <= 6) { hpMult = 1.4; atkMult = 1.3; }
   else { hpMult = 1.8; atkMult = 1.6; }
   // Sect Archive scaling: +5% if 3+ items unlocked, +10% if 8+
-  const unlockedCount = (runState.unlockedItems || []).length;
+  const unlockedCount = (metaState?.unlockedItems || []).length;
   if (unlockedCount >= 8) { hpMult *= 1.10; atkMult *= 1.10; }
   else if (unlockedCount >= 3) { hpMult *= 1.05; atkMult *= 1.05; }
   // Fate Imprint: legend +5% ATK, feared +10% ATK
@@ -441,7 +466,7 @@ function generateEnemy(nodeType, runState) {
   });
   if (nodeType === 'boss') {
     // Randomly pick B01 or B02; B02 requires SA09 unlock
-    const hasBossUnlock = (runState.unlockedItems || []).includes('B02');
+    const hasBossUnlock = (metaState?.unlockedItems || []).includes('B02');
     const bossPool = hasBossUnlock ? ['B01', 'B02'] : ['B01'];
     const pick = bossPool[Math.floor(Math.random() * bossPool.length)];
     const boss = BOSSES[pick];

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useGame } from '../store/gameStore.jsx';
 
 const IMPRINT_FLAVOUR = {
@@ -103,7 +104,11 @@ export default function LegacyScreen() {
   const { state, actions } = useGame();
   const { runState, metaState } = state;
 
-  const inheritedTechnique = runState.techniques.length > 0 ? runState.techniques[0] : null;
+  const [selectedTechIdx, setSelectedTechIdx] = useState(0);
+
+  const inheritedTechnique = runState.techniques.length > 0
+    ? runState.techniques[selectedTechIdx] || runState.techniques[0]
+    : null;
 
   const handleNextLife = () => {
     actions.chooseInheritance(inheritedTechnique, null);
@@ -151,6 +156,35 @@ export default function LegacyScreen() {
         <div style={S.divider} />
 
         <div style={S.sectionTitle}>Inheritance — What Passes to the Next Life</div>
+        {runState.techniques.length > 1 && (
+          <div style={{ marginBottom: '8px' }}>
+            <div style={{ fontSize: '11px', color: '#c8a96e88', marginBottom: '6px' }}>Choose one technique to carry forward:</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {runState.techniques.map((tech, idx) => (
+                <button
+                  key={tech.id}
+                  onClick={() => setSelectedTechIdx(idx)}
+                  style={{
+                    padding: '8px 12px',
+                    background: selectedTechIdx === idx ? '#3a2a10' : '#1a1208',
+                    border: `1px solid ${selectedTechIdx === idx ? '#c8a96e' : '#c8a96e33'}`,
+                    color: selectedTechIdx === idx ? '#e8c87e' : '#c8a96e88',
+                    fontFamily: 'serif',
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    borderRadius: '2px',
+                    display: 'flex',
+                    justifyContent: 'space-between'
+                  }}
+                >
+                  <span>{tech.name}</span>
+                  <span style={{ fontSize: '10px', opacity: 0.7 }}>{tech.tags?.join(', ')}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <div style={S.inheritSlot(!!inheritedTechnique)}>
           <span style={S.slotIcon}>📜</span>
           <div>
@@ -158,6 +192,15 @@ export default function LegacyScreen() {
             <div style={S.slotDesc}>{inheritedTechnique ? inheritedTechnique.description : 'Study harder in your next life'}</div>
           </div>
         </div>
+        {(runState.techniqueShards || 0) > 0 && (
+          <div style={S.inheritSlot(true)}>
+            <span style={S.slotIcon}>🔮</span>
+            <div>
+              <div style={S.slotName}>Technique Shards: ×{runState.techniqueShards}</div>
+              <div style={S.slotDesc}>Fragments of mastery absorbed on the road</div>
+            </div>
+          </div>
+        )}
         <div style={S.inheritSlot(false)}>
           <span style={S.slotIcon}>⭐</span>
           <div>

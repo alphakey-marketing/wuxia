@@ -53,6 +53,8 @@ function formatOutcome(outcome) {
   if (outcome.technique) parts.push('+ Technique');
   if (outcome.relic) parts.push('+ Relic');
   if (outcome.memorySeal) parts.push('Memory Seal');
+  if (outcome.techniqueShard) parts.push('+ Technique Shard');
+  if (outcome.shop) parts.push('🛒 Open Shop');
   if (outcome.karma) {
     Object.entries(outcome.karma).forEach(([k, v]) => parts.push(`${k} ${v > 0 ? '+' : ''}${v}`));
   }
@@ -82,9 +84,10 @@ export default function EventScreen() {
 
   const handleChoice = (choice) => {
     const outcome = { ...choice.outcome };
-    // Apply karma requirement check — use event's failureOutcome if defined, else default penalty
-    if (choice.karmaRequirement && runState?.karma) {
-      const meetsReq = Object.entries(choice.karmaRequirement).every(
+    // Apply karma requirement check — requiresKarma lives inside outcome in the events data
+    const karmaReq = choice.outcome?.requiresKarma;
+    if (karmaReq && runState?.karma) {
+      const meetsReq = Object.entries(karmaReq).every(
         ([axis, minVal]) => (runState.karma[axis] || 0) >= minVal
       );
       if (!meetsReq) {
@@ -104,18 +107,27 @@ export default function EventScreen() {
         <div style={S.divider} />
         <p style={S.description}>{event.description}</p>
         <div style={S.choices}>
-          {event.choices.map((choice, i) => (
-            <button
-              key={i}
-              style={S.choiceBtn}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = '#c8a96e'; e.currentTarget.style.background = '#3a2a18'; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = '#c8a96e44'; e.currentTarget.style.background = '#2a1e10'; }}
-              onClick={() => handleChoice(choice)}
-            >
-              <span>{choice.text}</span>
-              <span style={S.outcomePreview}>{formatOutcome(choice.outcome)}</span>
-            </button>
-          ))}
+          {event.choices.map((choice, i) => {
+            const karmaReq = choice.outcome?.requiresKarma;
+            const meetsKarma = !karmaReq || !runState?.karma || Object.entries(karmaReq).every(
+              ([axis, minVal]) => (runState.karma[axis] || 0) >= minVal
+            );
+            const karmaHint = karmaReq && !meetsKarma
+              ? Object.entries(karmaReq).map(([axis, val]) => `${axis} ≥ ${val}`).join(', ')
+              : null;
+            return (
+              <button
+                key={i}
+                style={{ ...S.choiceBtn, ...(karmaHint ? { borderColor: '#8b4a4a66', opacity: 0.75 } : {}) }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = karmaHint ? '#8b4a4a' : '#c8a96e'; e.currentTarget.style.background = '#3a2a18'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = karmaHint ? '#8b4a4a66' : '#c8a96e44'; e.currentTarget.style.background = '#2a1e10'; }}
+                onClick={() => handleChoice(choice)}
+              >
+                <span>{choice.text}{karmaHint && <span style={{ fontSize: '10px', color: '#bf6a6a', marginLeft: '6px' }}>⚠ requires {karmaHint}</span>}</span>
+                <span style={S.outcomePreview}>{formatOutcome(choice.outcome)}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
     </div>
