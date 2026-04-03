@@ -127,11 +127,11 @@ const PHASE_MAP = [
 export default function NodeMap() {
   const { state, actions } = useGame();
   const { runState } = state;
-  const { nodeMap, currentNode } = runState;
+  const { nodeMap, currentNode, activeNodeIndex } = runState;
 
-  const canTravel = (nodeIndex) => nodeIndex === currentNode + 1 || (nodeIndex === currentNode && nodeIndex === 0);
-  const isPast = (nodeIndex) => nodeIndex < currentNode;
-  const isCurrent = (nodeIndex) => nodeIndex === currentNode;
+  const canTravel = (nodeIndex) => nodeIndex === currentNode + 1;
+  const isPast = (nodeIndex) => nodeIndex <= currentNode;
+  const isCurrent = (nodeIndex) => nodeIndex === activeNodeIndex;
 
   const renderForkNode = (node, nodeIdx) => {
     const forkKey = `fork_${nodeIdx}`;
@@ -171,7 +171,7 @@ export default function NodeMap() {
       <div style={S.header}>
         <div style={S.title}>江湖路線 · Path Through Jianghu</div>
         <div style={{ fontSize: '13px', color: '#c8a96e88' }}>
-          Node {currentNode + 1} / {nodeMap.length}
+          Node {currentNode + 2} / {nodeMap.length}
         </div>
       </div>
 
@@ -226,7 +226,7 @@ export default function NodeMap() {
 
       <BuildSummary />
 
-      {isCurrent(currentNode) && nodeMap[currentNode] && nodeMap[currentNode].type !== 'fork' && (
+      {activeNodeIndex === null && currentNode < nodeMap.length - 1 && (
         <div style={{ marginTop: '10px', textAlign: 'center', color: '#c8a96e88', fontSize: '13px' }}>
           Click the next node to continue your journey
         </div>

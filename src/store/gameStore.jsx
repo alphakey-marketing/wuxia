@@ -28,9 +28,10 @@ const DEFAULT_RUN_STATE = {
   relics: [],
   maxTechniques: 6,
   karma: { mercy: 0, honor: 0, ambition: 0, orthodoxy: 0, renown: 0 },
-  currentNode: 0,
+  currentNode: -1,
   phase: 1,
   nodeMap: [],
+  activeNodeIndex: null,
   qiBreakthroughs: 0,
   burningMeridianStacks: 0,
   run_flags: {},
@@ -158,14 +159,14 @@ function gameReducer(state, action) {
       const { nodeIndex } = action.payload;
       const node = state.runState.nodeMap[nodeIndex];
       if (!node) return state;
-      const newRunState = { ...state.runState, currentNode: nodeIndex };
+      // Fork nodes: stay on nodeMap and mark as activeNodeIndex so branch UI renders
+      if (node.type === 'fork') {
+        return { ...state, runState: { ...state.runState, activeNodeIndex: nodeIndex }, gamePhase: 'nodeMap', currentEnemy: null, pendingEvent: null };
+      }
+      const newRunState = { ...state.runState, activeNodeIndex: nodeIndex };
       let gamePhase = state.gamePhase;
       let currentEnemy = null;
       let pendingEvent = null;
-      // Fork nodes: stay on nodeMap phase but mark as current so NodeMap.jsx renders branch choices
-      if (node.type === 'fork') {
-        return { ...state, runState: newRunState, gamePhase: 'nodeMap', currentEnemy: null, pendingEvent: null };
-      }
       if (node.type === 'combat' || node.type === 'elite' || node.type === 'boss' || node.type === 'ambush') {
         gamePhase = 'combat';
         currentEnemy = generateEnemy(node.type, state.runState, state.metaState);
@@ -195,7 +196,7 @@ function gameReducer(state, action) {
       const newRunState = {
         ...state.runState,
         nodeMap: newNodeMap,
-        currentNode: nodeIndex,
+        activeNodeIndex: nodeIndex,
         run_flags: { ...state.runState.run_flags, [`fork_${nodeIndex}`]: branchIndex }
       };
       // Route based on chosen branch type
@@ -242,6 +243,7 @@ function gameReducer(state, action) {
       const essenceMultiplier = (bossId && state.runState.run_flags?.driven_boss_boost) ? 2 : 1;
       const totalEssence = state.runState.legacyEssence + (essenceGained || 0) * essenceMultiplier;
       const isBoss = !!bossId;
+      const clearedNode = state.runState.activeNodeIndex;
       const newRunState = {
         ...state.runState,
         hp: remainingHp !== undefined ? remainingHp : state.runState.hp,
@@ -249,6 +251,8 @@ function gameReducer(state, action) {
         legacyEssence: totalEssence,
         karma,
         burningMeridianStacks: newStacks,
+        currentNode: clearedNode !== null && clearedNode !== undefined ? clearedNode : state.runState.currentNode,
+        activeNodeIndex: null,
         combatStats: {
           ...state.runState.combatStats,
           enemiesDefeated: state.runState.combatStats.enemiesDefeated + 1,
@@ -263,6 +267,12 @@ function gameReducer(state, action) {
       const { outcome } = action.payload;
       let newRunState = { ...state.runState };
       const maxTech = newRunState.maxTechniques || 6;
+      // Commit the active node as completed
+      const clearedNode = state.runState.activeNodeIndex;
+      if (clearedNode !== null && clearedNode !== undefined) {
+        newRunState.currentNode = clearedNode;
+        newRunState.activeNodeIndex = null;
+      }
       // Handle random outcome for E_GHOST_STORY
       let resolvedOutcome = outcome;
       if (outcome.random) {
@@ -413,10 +423,13 @@ function gameReducer(state, action) {
       const { cost } = action.payload;
       if (state.runState.silver < cost) return state;
       const healAmount = Math.floor(state.runState.maxHp * 0.4);
+      const clearedNode = state.runState.activeNodeIndex;
       const newRunState = {
         ...state.runState,
         silver: state.runState.silver - cost,
-        hp: Math.min(state.runState.maxHp, state.runState.hp + healAmount)
+        hp: Math.min(state.runState.maxHp, state.runState.hp + healAmount),
+        currentNode: clearedNode !== null && clearedNode !== undefined ? clearedNode : state.runState.currentNode,
+        activeNodeIndex: null
       };
       return { ...state, runState: newRunState, gamePhase: 'nodeMap' };
     }
@@ -468,7 +481,9 @@ function gameReducer(state, action) {
 
 function generateEnemy(nodeType, runState, metaState) {
   // Phase-based difficulty multipliers
-  const node = runState.currentNode || 0;
+  const node = runState.activeNodeIndex !== null && runState.activeNodeIndex !== undefined
+    ? runState.activeNodeIndex
+    : (runState.currentNode + 1);
   let hpMult = 1.0;
   let atkMult = 1.0;
   if (node <= 2) { hpMult = 1.0; atkMult = 1.0; }

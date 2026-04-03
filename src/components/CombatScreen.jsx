@@ -114,7 +114,7 @@ export default function CombatScreen() {
           <div style={S.enemyType(currentEnemy.type)}>{typeLabel}</div>
         </div>
         <div style={{ textAlign: 'right', fontSize: '12px', color: '#c8a96e88' }}>
-          <div>Node {runState.currentNode + 1}</div>
+          <div>Node {(runState.activeNodeIndex !== null && runState.activeNodeIndex !== undefined ? runState.activeNodeIndex : runState.currentNode) + 1}</div>
           <div style={{ color: '#e8c87e' }}>HP: {runState.hp}/{runState.maxHp}</div>
         </div>
       </div>
