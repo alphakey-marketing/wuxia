@@ -58,17 +58,42 @@ const STYLES = {
     marginTop: '2px',
     borderRadius: '2px'
   },
-  interruptFlash: {
-    animation: 'pulse 0.3s infinite'
-  }
+  bossDialogue: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    background: 'rgba(10,6,2,0.92)',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+    padding: '30px'
+  },
+  dialogueTitle: { fontSize: '18px', color: '#e8c87e', marginBottom: '12px', letterSpacing: '0.15em' },
+  dialogueText: { fontSize: '13px', color: '#c8a96e', lineHeight: '1.7', textAlign: 'center', marginBottom: '24px', fontStyle: 'italic' },
+  dialogueBtn: (variant) => ({
+    padding: '12px 28px',
+    background: variant === 'spare' ? '#1a2a1a' : '#2a1a1a',
+    border: `1px solid ${variant === 'spare' ? '#6abf6a' : '#bf6a6a'}`,
+    color: variant === 'spare' ? '#6abf6a' : '#bf6a6a',
+    fontFamily: 'serif',
+    fontSize: '13px',
+    cursor: 'pointer',
+    margin: '4px',
+    minWidth: '140px',
+    minHeight: '44px'
+  })
 };
 
 export default function PhaserGame({ enemy, playerStats, weapon, innerArt, movementArt, techniques, relics, burningMeridianStacks, onCombatEnd }) {
   const gameRef = useRef(null);
   const containerRef = useRef(null);
   const sceneRef = useRef(null);
+  const onCombatEndRef = useRef(onCombatEnd);
+  useEffect(() => { onCombatEndRef.current = onCombatEnd; }, [onCombatEnd]);
   const [cooldowns, setCooldowns] = useState({ skill1: 0, skill1Max: 5, skill2: 0, skill2Max: 8, ultimate: 0, ultimateMax: 10, dash: 0, dashMax: 3, burningStacks: 0, interruptWindow: false });
   const [combatStats, setCombatStats] = useState({ playerQi: 0, playerMaxQi: 100 });
+  const [pendingBossResult, setPendingBossResult] = useState(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -92,6 +117,19 @@ export default function PhaserGame({ enemy, playerStats, weapon, innerArt, movem
     game.events.on('cooldownUpdate', (data) => setCooldowns(data));
     game.events.on('statsUpdate', (data) => setCombatStats(data));
 
+    // Boss karma dialogue intercept
+    game.events.on('bossDefeated', (result) => {
+      const karma = playerStats?.karma || {};
+      // B01: mercy ≥ 2 opens spare dialogue
+      if (result.bossId === 'B01' && (karma.mercy || 0) >= 2) {
+        setPendingBossResult(result);
+      } else {
+        // No karma link applicable — proceed directly
+        game.destroy(true);
+        onCombatEndRef.current(result);
+      }
+    });
+
     const activeSynergies = techniques ? detectSynergies(techniques) : [];
 
     game.events.once('ready', () => {
@@ -113,11 +151,17 @@ export default function PhaserGame({ enemy, playerStats, weapon, innerArt, movem
         relics: relics || [],
         activeSynergies,
         burningMeridianStacks: burningMeridianStacks || 0,
-        onCombatEnd: (result) => {
-          game.destroy(true);
-          onCombatEnd(result);
-        }
+        karma: playerStats?.karma || {},
+        onCombatEnd: null  // not used — bossDefeated event handles boss; non-boss uses onCombatEnd directly
       });
+      // Wire non-boss onCombatEnd for standard/elite victories
+      scene.onCombatEnd = (result) => {
+        if (!result.bossId) {
+          game.destroy(true);
+          onCombatEndRef.current(result);
+        }
+        // Boss victories handled via bossDefeated event
+      };
     });
 
     return () => {
@@ -145,6 +189,22 @@ export default function PhaserGame({ enemy, playerStats, weapon, innerArt, movem
     if (scene && scene.useDash) scene.useDash();
   };
 
+  const handleSpare = () => {
+    if (!pendingBossResult) return;
+    const result = { ...pendingBossResult, sparedBoss: true };
+    setPendingBossResult(null);
+    if (gameRef.current && !gameRef.current.isDestroyed) gameRef.current.destroy(true);
+    onCombatEndRef.current(result);
+  };
+
+  const handleExecute = () => {
+    if (!pendingBossResult) return;
+    const result = { ...pendingBossResult, sparedBoss: false };
+    setPendingBossResult(null);
+    if (gameRef.current && !gameRef.current.isDestroyed) gameRef.current.destroy(true);
+    onCombatEndRef.current(result);
+  };
+
   const skill1Pct = cooldowns.skill1 > 0 ? ((cooldowns.skill1Max - cooldowns.skill1) / cooldowns.skill1Max) * 100 : 100;
   const skill2Pct = cooldowns.skill2 > 0 ? ((cooldowns.skill2Max - cooldowns.skill2) / cooldowns.skill2Max) * 100 : 100;
   const dashPct = cooldowns.dash > 0 ? ((cooldowns.dashMax - cooldowns.dash) / cooldowns.dashMax) * 100 : 100;
@@ -155,6 +215,26 @@ export default function PhaserGame({ enemy, playerStats, weapon, innerArt, movem
   return (
     <div style={STYLES.wrapper}>
       <div ref={containerRef} style={STYLES.canvas} />
+      {pendingBossResult && (
+        <div style={STYLES.bossDialogue}>
+          <div style={STYLES.dialogueTitle}>⚖ A Moment of Choice</div>
+          <div style={STYLES.dialogueText}>
+            {pendingBossResult.bossId === 'B01'
+              ? 'Iron Fan Widow kneels in the dust, her fan shattered. She looks up at you — her eyes hold no more fury, only exhaustion. Your merciful heart stirs. She wronged you, but perhaps she was also wronged.\n\nDo you spare her life?'
+              : 'Your enemy is defeated. What is your choice?'}
+          </div>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <button style={STYLES.dialogueBtn('spare')} onClick={handleSpare}>
+              🕊 Spare Her
+              <span style={{ display: 'block', fontSize: '10px', opacity: 0.7 }}>Sets Memory Seal · +Mercy</span>
+            </button>
+            <button style={STYLES.dialogueBtn('execute')} onClick={handleExecute}>
+              ⚔ Execute Her
+              <span style={{ display: 'block', fontSize: '10px', opacity: 0.7 }}>+Renown · Beggar's Union favour</span>
+            </button>
+          </div>
+        </div>
+      )}
       <div style={STYLES.controls}>
         <div style={{ textAlign: 'center' }}>
           <button

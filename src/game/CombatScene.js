@@ -127,6 +127,8 @@ export class CombatScene extends Phaser.Scene {
     this.foxCharmUsed = false;
     // Drunken Swordsman dodge tracking
     this.drunkenSwordsDodgeChance = this.enemyData.id === 'E09' ? 0.30 : 0;
+    // Boss karma links
+    this.initKarma = data.karma || {};
   }
 
   preload() {}
@@ -863,17 +865,28 @@ export class CombatScene extends Phaser.Scene {
     if (this.relics.some(r => r.id === 'R04')) {
       this.playerHp = Math.min(this.playerMaxHp, this.playerHp + 3);
     }
+    // Build base result
+    const result = {
+      victory: true,
+      damageDealt: this.totalDamage,
+      silverGained,
+      essenceGained,
+      remainingHp: this.playerHp,
+      remainingQi: this.playerQi,
+      burningMeridianStacks: this.burningMeridianStacks,
+      bossId: isBoss ? this.enemyData.id : null
+    };
+    // B02 karma-dependent technique drop
+    if (this.enemyData.id === 'B02') {
+      const orthodoxy = this.initKarma?.orthodoxy || 0;
+      result.techDropId = orthodoxy >= 2 ? 'T19' : 'T17';
+    }
     this.time.delayedCall(1500, () => {
-      if (this.onCombatEnd) {
-        this.onCombatEnd({
-          victory: true,
-          damageDealt: this.totalDamage,
-          silverGained,
-          essenceGained,
-          remainingHp: this.playerHp,
-          remainingQi: this.playerQi,
-          burningMeridianStacks: this.burningMeridianStacks
-        });
+      // Emit bossDefeated so PhaserGame.jsx can show karma dialogue
+      if (isBoss && this.game?.events) {
+        this.game.events.emit('bossDefeated', result);
+      } else if (this.onCombatEnd) {
+        this.onCombatEnd(result);
       }
     });
   }

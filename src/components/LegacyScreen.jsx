@@ -1,5 +1,28 @@
 import { useGame } from '../store/gameStore.jsx';
 
+const IMPRINT_FLAVOUR = {
+  compassionate: '"A merciful heart left footprints on the jianghu. Even the winds grew gentle in your wake."',
+  blood_handed: '"The rivers ran red with remembered debts. Your name is spoken quietly, and doors are locked."',
+  righteous: '"A righteous blade — even the heavens bowed. Your name is carved in the stones of righteous halls."',
+  schemer: '"Every shadow held a hidden move. The jianghu respects power, and cunning is its sharpest edge."',
+  driven: '"Ambition carved its name into legend. The mountain yields to those who refuse to be stopped."',
+  grandmaster: '"The old ways endure through those who honour them. The masters nod from the other side of the veil."',
+  forbidden: '"What the sects forbade, this fist remembered. The forbidden path leaves marks that cannot be washed away."',
+  legend: '"Songs were sung of this swordsman for three generations. Even enemies hummed the melody."',
+  feared: '"Even the wind stepped aside on this road. Your shadow was enough to empty a village square."'
+};
+
+function getKarmaFlavour(karma, fateImprint) {
+  if (fateImprint && IMPRINT_FLAVOUR[fateImprint]) return IMPRINT_FLAVOUR[fateImprint];
+  const { mercy, honor, ambition, orthodoxy } = karma;
+  if (mercy >= 3) return '"Your kindness left marks on the road — even stones remember."';
+  if (mercy <= -2) return '"A warrior who abandons the fallen walks alone."';
+  if (honor >= 3) return '"Your name is spoken with reverence in halls you never entered."';
+  if (ambition >= 3) return '"Hunger for greatness is also a fire that can burn you."';
+  if (orthodoxy <= -2) return '"The forbidden path leaves its mark. The jianghu whispers your name with fear."';
+  return '"Every life is a brushstroke on the canvas of the jianghu."';
+}
+
 const S = {
   container: {
     minHeight: '100vh',
@@ -76,19 +99,9 @@ const S = {
   }
 };
 
-function getKarmaFlavor(karma) {
-  const { mercy, honor, ambition, orthodoxy } = karma;
-  if (mercy >= 3) return '"Your kindness left marks on the road — even stones remember."';
-  if (mercy <= -2) return '"A warrior who abandons the fallen walks alone."';
-  if (honor >= 3) return '"Your name is spoken with reverence in halls you never entered."';
-  if (ambition >= 3) return '"Hunger for greatness is also a fire that can burn you."';
-  if (orthodoxy <= -2) return '"The forbidden path leaves its mark. The jianghu whispers your name with fear."';
-  return '"Every life is a brushstroke on the canvas of the jianghu."';
-}
-
 export default function LegacyScreen() {
   const { state, actions } = useGame();
-  const { runState } = state;
+  const { runState, metaState } = state;
 
   const inheritedTechnique = runState.techniques.length > 0 ? runState.techniques[0] : null;
 
@@ -163,7 +176,19 @@ export default function LegacyScreen() {
           </div>
         )}
 
-        <div style={S.flavorText}>{getKarmaFlavor(runState.karma)}</div>
+        {metaState?.fateImprint && (
+          <div style={{ ...S.inheritSlot(true), background: '#2a1a2a', border: '1px solid #6b2a6b44' }}>
+            <span style={S.slotIcon}>🌟</span>
+            <div>
+              <div style={{ ...S.slotName, color: '#c88bcc' }}>
+                Fate Imprint: {metaState.fateImprint.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+              </div>
+              <div style={S.slotDesc}>This imprint carries into your next life</div>
+            </div>
+          </div>
+        )}
+
+        <div style={S.flavorText}>{getKarmaFlavour(runState.karma, metaState?.fateImprint)}</div>
       </div>
 
       <button

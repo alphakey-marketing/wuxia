@@ -69,6 +69,7 @@ const EVENT_ICONS = {
 export default function EventScreen() {
   const { state, actions } = useGame();
   const event = state.pendingEvent;
+  const runState = state.runState;
 
   if (!event) {
     return (
@@ -80,7 +81,19 @@ export default function EventScreen() {
   }
 
   const handleChoice = (choice) => {
-    actions.completeEvent(choice.outcome);
+    const outcome = { ...choice.outcome };
+    // Apply karma requirement check — use event's failureOutcome if defined, else default penalty
+    if (choice.karmaRequirement && runState?.karma) {
+      const meetsReq = Object.entries(choice.karmaRequirement).every(
+        ([axis, minVal]) => (runState.karma[axis] || 0) >= minVal
+      );
+      if (!meetsReq) {
+        const failOutcome = event.failureOutcome || { karma: { honor: -1 }, hpLoss: 20 };
+        actions.completeEvent(failOutcome);
+        return;
+      }
+    }
+    actions.completeEvent(outcome);
   };
 
   return (

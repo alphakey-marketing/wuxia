@@ -100,16 +100,6 @@ export const EVENTS = [
     ]
   },
   {
-    id: 'E_SECT_TRIAL',
-    name: 'The Sect Trial',
-    description: 'You arrive at a sect outpost. They offer to test your martial skill.',
-    choices: [
-      { text: 'Accept the trial (+1 combat)', outcome: { karma: { honor: 1 }, relic: 'R11', note: 'Pass for sect bonus' } },
-      { text: 'Decline respectfully', outcome: {} },
-      { text: 'Cheat using a forbidden technique', outcome: { karma: { orthodoxy: -2, honor: -1 }, silver: 30 } }
-    ]
-  },
-  {
     id: 'E_GHOST_STORY',
     name: 'The Ghost on the Road',
     description: 'A spirit confronts you: the ghost of someone from your past life. It offers a gift — or a curse.',
@@ -117,6 +107,29 @@ export const EVENTS = [
       { text: 'Accept the gift (unknown)', outcome: { random: true, note: 'Random: technique, relic, or HP loss' } },
       { text: 'Refuse and banish it', outcome: { karma: { orthodoxy: 1 }, essence: 20 } },
       { text: 'Listen to its story', outcome: { memorySeal: 'The Ghost You Heard', essence: 10 } }
+    ]
+  },
+  {
+    id: 'E_SECT_TRIAL',
+    name: 'The Sect Trial',
+    description: 'You arrive at a sect outpost. They offer to test your martial skill and assess your path.',
+    failureOutcome: { karma: { honor: -1 }, hpLoss: 20 },
+    choices: [
+      { text: 'Accept the orthodox trial', outcome: { karma: { honor: 1, orthodoxy: 1 }, relic: 'R11', note: 'Pass requires Orthodoxy ≥ 0' }, karmaRequirement: { orthodoxy: 0 } },
+      { text: 'Attempt the trial anyway', outcome: { karma: { honor: -1 }, hpLoss: 20, note: 'Without orthodox standing, you fail and take a penalty' } },
+      { text: 'Decline respectfully', outcome: {} },
+      { text: 'Cheat using a forbidden technique', outcome: { karma: { orthodoxy: -2, honor: -1 }, silver: 30 } }
+    ]
+  },
+  {
+    id: 'E_PAST_LIFE_WIDOW',
+    name: 'A Familiar Face',
+    requiresSeal: 'spared_iron_fan_widow',
+    description: 'On a dusty road, you recognize a woman in plain clothes. It is the Iron Fan Widow — alive, reformed, running a small medicine stall. She meets your eyes. She remembers.',
+    choices: [
+      { text: 'Speak with her (she gives you a gift)', outcome: { healHp: 30, karma: { mercy: 1 }, technique: 'T02', note: 'She teaches you a technique from her late husband\'s school' } },
+      { text: 'Walk past without engaging', outcome: { essence: 10, karma: { honor: 1 } } },
+      { text: 'Report her location to the constables', outcome: { silver: 50, karma: { mercy: -3, honor: -2 } } }
     ]
   }
 ];

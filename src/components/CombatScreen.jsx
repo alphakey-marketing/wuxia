@@ -93,6 +93,14 @@ export default function CombatScreen() {
   }
 
   const handleCombatEnd = (result) => {
+    // Handle boss spare dialogue result — set run flag before completing combat
+    if (result.sparedBoss && result.bossId === 'B01') {
+      actions.setRunFlag('spared_iron_fan_widow', true);
+      // Karma reward for sparing
+      result.karmaBonus = { mercy: 1 };
+    } else if (result.sparedBoss === false && result.bossId === 'B01') {
+      result.karmaBonus = { renown: 1 };
+    }
     actions.completeCombat(result);
   };
 

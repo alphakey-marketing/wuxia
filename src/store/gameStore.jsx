@@ -2,6 +2,7 @@ import React, { createContext, useContext, useReducer } from 'react';
 import { WEAPONS } from '../data/weapons.js';
 import { INNER_ARTS } from '../data/innerArts.js';
 import { MOVEMENT_ARTS } from '../data/movementArts.js';
+import { RELICS } from '../data/relics.js';
 import { generateNodeMap } from '../utils/nodeMap.js';
 import { ENEMIES, BOSSES } from '../data/enemies.js';
 import { EVENTS } from '../data/events.js';
@@ -24,6 +25,7 @@ const DEFAULT_RUN_STATE = {
   movementArt: null,
   techniques: [],
   relics: [],
+  maxTechniques: 6,
   karma: { mercy: 0, honor: 0, ambition: 0, orthodoxy: 0, renown: 0 },
   currentNode: 0,
   phase: 1,
@@ -94,12 +96,10 @@ function gameReducer(state, action) {
       let maxHp = 120;
       if (state.metaState.unlockedItems.includes('healerBloodline')) maxHp += 30;
       if (state.metaState.unlockedItems.includes('R01')) maxHp += 25;
-      // Fate Imprint effects
       const imprint = state.metaState.fateImprint;
-      if (imprint === 'compassionate') {
-        // One extra healer node — handled in node generation; give HP bonus here
-        maxHp += 10;
-      }
+      // Apply Fate Imprint effects — §11.3
+      if (imprint === 'compassionate') maxHp += 10;
+      if (imprint === 'legend') maxHp += 15;
       const runState = {
         ...DEFAULT_RUN_STATE,
         maxHp,
@@ -111,10 +111,45 @@ function gameReducer(state, action) {
         movementArt: movArtData,
         silver: 50,
         nodeMap,
+        maxTechniques: 6,
         techniques: state.metaState.inheritedManual ? [state.metaState.inheritedManual] : [],
         relics: [],
         run_flags: {}
       };
+      // blood_handed: +5 attack, flag reduces healer count on map
+      if (imprint === 'blood_handed') {
+        runState.attack += 5;
+        runState.run_flags.blood_handed_start = true;
+      }
+      // righteous: start with 1 random honor-tagged relic (use R11 Empty Hand Bell as honor relic)
+      if (imprint === 'righteous') {
+        const honorRelic = RELICS['R11'];
+        if (honorRelic && runState.relics.length < 4) runState.relics = [honorRelic];
+      }
+      // schemer: +20 silver at start
+      if (imprint === 'schemer') {
+        runState.silver += 20;
+      }
+      // driven: boss HP boost — stored as flag, applied in generateEnemy
+      if (imprint === 'driven') {
+        runState.run_flags.driven_boss_boost = true;
+      }
+      // grandmaster: guaranteed wandering master node — stored as flag
+      if (imprint === 'grandmaster') {
+        runState.run_flags.guaranteed_wandering_master = true;
+      }
+      // forbidden: unlock 7th technique slot
+      if (imprint === 'forbidden') {
+        runState.maxTechniques = 7;
+      }
+      // legend: enemy +5% ATK — stored as flag, applied in generateEnemy
+      if (imprint === 'legend') {
+        runState.run_flags.legend_enemy_boost = true;
+      }
+      // feared: enemy +10% ATK but +20% silver — stored as flags
+      if (imprint === 'feared') {
+        runState.run_flags.feared_start = true;
+      }
       return { ...state, runState, gamePhase: 'nodeMap' };
     }
     case 'TRAVEL_TO_NODE': {
@@ -125,12 +160,16 @@ function gameReducer(state, action) {
       let gamePhase = state.gamePhase;
       let currentEnemy = null;
       let pendingEvent = null;
+      // Fork nodes: stay on nodeMap phase but mark as current so NodeMap.jsx renders branch choices
+      if (node.type === 'fork') {
+        return { ...state, runState: newRunState, gamePhase: 'nodeMap', currentEnemy: null, pendingEvent: null };
+      }
       if (node.type === 'combat' || node.type === 'elite' || node.type === 'boss' || node.type === 'ambush') {
         gamePhase = 'combat';
         currentEnemy = generateEnemy(node.type, state.runState);
       } else if (node.type === 'event' || node.type === 'majorEvent' || node.type === 'wanderingMaster' || node.type === 'sectTrial' || node.type === 'hiddenCave') {
         gamePhase = 'event';
-        pendingEvent = selectEvent(node.type, state.runState);
+        pendingEvent = selectEvent(node.type, state.runState, state.metaState);
       } else if (node.type === 'healer') {
         gamePhase = 'healer';
       } else if (node.type === 'blackMarket') {
@@ -140,8 +179,40 @@ function gameReducer(state, action) {
       }
       return { ...state, runState: newRunState, gamePhase, currentEnemy, pendingEvent };
     }
+    case 'CHOOSE_FORK': {
+      const { nodeIndex, branchIndex } = action.payload;
+      const node = state.runState.nodeMap[nodeIndex];
+      if (!node || node.type !== 'fork' || !node.branches?.[branchIndex]) return state;
+      const chosenBranch = node.branches[branchIndex];
+      // Resolve the fork node to the chosen branch type in the map
+      const newNodeMap = state.runState.nodeMap.map((n, i) =>
+        i === nodeIndex ? { ...n, type: chosenBranch.type, label: chosenBranch.label, resolved: true } : n
+      );
+      const newRunState = {
+        ...state.runState,
+        nodeMap: newNodeMap,
+        currentNode: nodeIndex,
+        run_flags: { ...state.runState.run_flags, [`fork_${nodeIndex}`]: branchIndex }
+      };
+      // Route based on chosen branch type
+      let gamePhase = state.gamePhase;
+      let currentEnemy = null;
+      let pendingEvent = null;
+      if (chosenBranch.type === 'combat' || chosenBranch.type === 'elite' || chosenBranch.type === 'boss' || chosenBranch.type === 'ambush') {
+        gamePhase = 'combat';
+        currentEnemy = generateEnemy(chosenBranch.type, newRunState);
+      } else if (chosenBranch.type === 'event' || chosenBranch.type === 'majorEvent' || chosenBranch.type === 'wanderingMaster' || chosenBranch.type === 'sectTrial' || chosenBranch.type === 'hiddenCave') {
+        gamePhase = 'event';
+        pendingEvent = selectEvent(chosenBranch.type, newRunState, state.metaState);
+      } else if (chosenBranch.type === 'healer') {
+        gamePhase = 'healer';
+      } else if (chosenBranch.type === 'blackMarket') {
+        gamePhase = 'blackMarket';
+      }
+      return { ...state, runState: newRunState, gamePhase, currentEnemy, pendingEvent };
+    }
     case 'COMPLETE_COMBAT': {
-      const { victory, damageDealt, silverGained, essenceGained, remainingHp, burningMeridianStacks } = action.payload;
+      const { victory, damageDealt, silverGained, essenceGained, remainingHp, burningMeridianStacks, karmaBonus, bossId } = action.payload;
       if (!victory) {
         const newMeta = {
           ...state.metaState,
@@ -153,15 +224,29 @@ function gameReducer(state, action) {
       const newStacks = burningMeridianStacks !== undefined ? burningMeridianStacks :
         (state.runState.innerArt?.id === 'burningMeridian'
           ? Math.min((state.runState.burningMeridianStacks || 0) + 1, 10) : state.runState.burningMeridianStacks);
+      let karma = state.runState.karma;
+      if (karmaBonus) {
+        karma = { ...karma };
+        Object.entries(karmaBonus).forEach(([k, v]) => { karma[k] = (karma[k] || 0) + v; });
+      }
+      // Feared imprint: +20% silver from combat
+      const silverMultiplier = state.runState.run_flags?.feared_start ? 1.2 : 1.0;
+      const totalSilver = state.runState.silver + Math.floor((silverGained || 0) * silverMultiplier);
+      // Driven imprint: ×2 essence on boss victory
+      const essenceMultiplier = (bossId && state.runState.run_flags?.driven_boss_boost) ? 2 : 1;
+      const totalEssence = state.runState.legacyEssence + (essenceGained || 0) * essenceMultiplier;
+      const isBoss = !!bossId;
       const newRunState = {
         ...state.runState,
         hp: remainingHp !== undefined ? remainingHp : state.runState.hp,
-        silver: state.runState.silver + (silverGained || 0),
-        legacyEssence: state.runState.legacyEssence + (essenceGained || 0),
+        silver: totalSilver,
+        legacyEssence: totalEssence,
+        karma,
         burningMeridianStacks: newStacks,
         combatStats: {
           ...state.runState.combatStats,
           enemiesDefeated: state.runState.combatStats.enemiesDefeated + 1,
+          bossesDefeated: (state.runState.combatStats.bossesDefeated || 0) + (isBoss ? 1 : 0),
           totalDamage: state.runState.combatStats.totalDamage + (damageDealt || 0)
         }
       };
@@ -173,6 +258,7 @@ function gameReducer(state, action) {
       let newRunState = { ...state.runState };
       if (outcome.healHp) newRunState.hp = Math.min(newRunState.maxHp, newRunState.hp + outcome.healHp);
       if (outcome.hpMax) newRunState.maxHp = newRunState.maxHp + outcome.hpMax;
+      if (outcome.hpLoss) newRunState.hp = Math.max(1, newRunState.hp - outcome.hpLoss);
       if (outcome.silver) newRunState.silver = newRunState.silver + outcome.silver;
       if (outcome.essence) newRunState.legacyEssence = newRunState.legacyEssence + outcome.essence;
       if (outcome.karma) {
@@ -184,7 +270,8 @@ function gameReducer(state, action) {
     case 'CHOOSE_REWARD': {
       const { reward } = action.payload;
       let newRunState = { ...state.runState };
-      if (reward.type === 'newTechnique' && newRunState.techniques.length < 6) {
+      const maxTech = newRunState.maxTechniques || 6;
+      if (reward.type === 'newTechnique' && newRunState.techniques.length < maxTech) {
         newRunState.techniques = [...newRunState.techniques, reward.data];
       } else if (reward.type === 'relic' && newRunState.relics.length < 4) {
         newRunState.relics = [...newRunState.relics, reward.data];
@@ -221,10 +308,17 @@ function gameReducer(state, action) {
         furthestNodeReached: Math.max(state.metaState.lifetimeStats?.furthestNodeReached || 0, state.runState.currentNode),
         bestRunDamage: Math.max(state.metaState.lifetimeStats?.bestRunDamage || 0, state.runState.combatStats.totalDamage)
       };
+      // Memory Seal: most significant choice flag from this run
+      const flags = state.runState.run_flags || {};
+      let memorySeal = state.metaState.memorySeal; // carry forward by default
+      if (flags.spared_iron_fan_widow) memorySeal = 'spared_iron_fan_widow';
+      else if (flags.entered_forbidden_cave) memorySeal = 'entered_forbidden_cave';
+      else if (flags.joined_black_cliff) memorySeal = 'joined_black_cliff';
       const newMeta = {
         ...state.metaState,
         legacyEssence: state.metaState.legacyEssence + state.runState.legacyEssence,
         fateImprint,
+        memorySeal,
         lifetimeStats,
         runHistory: [...state.metaState.runHistory, runRecord]
       };
@@ -282,10 +376,11 @@ function gameReducer(state, action) {
       const { item, cost, itemType } = action.payload;
       if (state.runState.silver < cost) return state;
       let newRunState = { ...state.runState, silver: state.runState.silver - cost };
+      const maxTech = newRunState.maxTechniques || 6;
       if (itemType === 'relic' && newRunState.relics.length < 4) {
         newRunState.relics = [...newRunState.relics, item];
         if (item.id === 'R01') newRunState.maxHp += 25;
-      } else if (itemType === 'technique' && newRunState.techniques.length < 6) {
+      } else if (itemType === 'technique' && newRunState.techniques.length < maxTech) {
         newRunState.techniques = [...newRunState.techniques, item];
       }
       return { ...state, runState: newRunState };
@@ -331,10 +426,14 @@ function generateEnemy(nodeType, runState) {
   if (node <= 2) { hpMult = 1.0; atkMult = 1.0; }
   else if (node <= 6) { hpMult = 1.4; atkMult = 1.3; }
   else { hpMult = 1.8; atkMult = 1.6; }
-  // Sect Archive scaling: +5% per phase if 3+ items unlocked, +10% if 8+
+  // Sect Archive scaling: +5% if 3+ items unlocked, +10% if 8+
   const unlockedCount = (runState.unlockedItems || []).length;
   if (unlockedCount >= 8) { hpMult *= 1.10; atkMult *= 1.10; }
   else if (unlockedCount >= 3) { hpMult *= 1.05; atkMult *= 1.05; }
+  // Fate Imprint: legend +5% ATK, feared +10% ATK
+  const flags = runState.run_flags || {};
+  if (flags.legend_enemy_boost) atkMult *= 1.05;
+  if (flags.feared_start) atkMult *= 1.10;
   const scale = (enemy) => ({
     ...enemy,
     hp: Math.round(enemy.hp * hpMult),
@@ -346,7 +445,10 @@ function generateEnemy(nodeType, runState) {
     const bossPool = hasBossUnlock ? ['B01', 'B02'] : ['B01'];
     const pick = bossPool[Math.floor(Math.random() * bossPool.length)];
     const boss = BOSSES[pick];
-    return { ...boss, hp: Math.round(boss.hp * 3.0), attack: Math.round(boss.attack * 2.0) };
+    let bossHpMult = 3.0;
+    let bossAtkMult = 2.0;
+    if (flags.driven_boss_boost) bossHpMult *= 1.10;
+    return { ...boss, hp: Math.round(boss.hp * bossHpMult), attack: Math.round(boss.attack * bossAtkMult) };
   }
   if (nodeType === 'elite' || nodeType === 'ambush') {
     const elites = Object.values(ENEMIES).filter(e => e.type === 'elite');
@@ -356,10 +458,13 @@ function generateEnemy(nodeType, runState) {
   return scale(standards[Math.floor(Math.random() * standards.length)]);
 }
 
-function selectEvent(nodeType, runState) {
+function selectEvent(nodeType, runState, metaState) {
   const flags = runState?.run_flags || {};
+  const seal = metaState?.memorySeal || null;
   let pool = [...EVENTS];
-  // Filter out events blocked by run flags
+  // Remove events that require a memory seal the player doesn't have
+  pool = pool.filter(e => !e.requiresSeal || e.requiresSeal === seal);
+  // Remove events blocked by run flags
   if (flags.joined_black_cliff) pool = pool.filter(e => e.id !== 'E_SECT_INVITATION');
   if (nodeType === 'wanderingMaster') return pool.find(e => e.id === 'E_WANDERING_MASTER') || pool[0];
   if (nodeType === 'sectTrial') return pool.find(e => e.id === 'E_SECT_TRIAL') || pool[0];
@@ -400,6 +505,7 @@ export function GameProvider({ children }) {
       dispatch({ type: 'HEAL_AT_HEALER', payload: { cost } }),
     setPhase: (phase) => dispatch({ type: 'SET_PHASE', payload: phase }),
     setRunFlag: (flag, value) => dispatch({ type: 'SET_RUN_FLAG', payload: { flag, value } }),
+    chooseFork: (nodeIndex, branchIndex) => dispatch({ type: 'CHOOSE_FORK', payload: { nodeIndex, branchIndex } }),
     buyFromMarket: (item, cost, itemType) => dispatch({ type: 'BUY_FROM_MARKET', payload: { item, cost, itemType } }),
     updateHp: (hp) => dispatch({ type: 'UPDATE_HP', payload: hp }),
     updateQi: (qi) => dispatch({ type: 'UPDATE_QI', payload: qi })
