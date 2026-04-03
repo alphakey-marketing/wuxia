@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Phaser from 'phaser';
 import { CombatScene } from './CombatScene.js';
+import { detectSynergies } from '../utils/synergies.js';
 
 const STYLES = {
   wrapper: {
@@ -31,15 +32,24 @@ const STYLES = {
     fontSize: '13px',
     fontFamily: 'serif',
     minWidth: '80px',
+    minHeight: '44px',
     transition: 'background 0.2s'
   },
   btnDisabled: {
     opacity: 0.4,
     cursor: 'not-allowed'
   },
+  btnSkill2: {
+    background: '#1a2a3a',
+    borderColor: '#4a8bcc'
+  },
   btnUltimate: {
     background: '#3a1a00',
     borderColor: '#ff8800'
+  },
+  btnDash: {
+    background: '#1a2a1a',
+    borderColor: '#4a8b4a'
   },
   cooldownBar: {
     height: '3px',
@@ -47,14 +57,17 @@ const STYLES = {
     transition: 'width 0.1s',
     marginTop: '2px',
     borderRadius: '2px'
+  },
+  interruptFlash: {
+    animation: 'pulse 0.3s infinite'
   }
 };
 
-export default function PhaserGame({ enemy, playerStats, weapon, onCombatEnd }) {
+export default function PhaserGame({ enemy, playerStats, weapon, innerArt, movementArt, techniques, relics, burningMeridianStacks, onCombatEnd }) {
   const gameRef = useRef(null);
   const containerRef = useRef(null);
   const sceneRef = useRef(null);
-  const [cooldowns, setCooldowns] = useState({ skill1: 0, skill1Max: 5, ultimate: 0, ultimateMax: 10 });
+  const [cooldowns, setCooldowns] = useState({ skill1: 0, skill1Max: 5, skill2: 0, skill2Max: 8, ultimate: 0, ultimateMax: 10, dash: 0, dashMax: 3, burningStacks: 0, interruptWindow: false });
   const [combatStats, setCombatStats] = useState({ playerQi: 0, playerMaxQi: 100 });
 
   useEffect(() => {
@@ -79,6 +92,8 @@ export default function PhaserGame({ enemy, playerStats, weapon, onCombatEnd }) 
     game.events.on('cooldownUpdate', (data) => setCooldowns(data));
     game.events.on('statsUpdate', (data) => setCombatStats(data));
 
+    const activeSynergies = techniques ? detectSynergies(techniques) : [];
+
     game.events.once('ready', () => {
       const scene = game.scene.getScene('CombatScene');
       sceneRef.current = scene;
@@ -87,9 +102,17 @@ export default function PhaserGame({ enemy, playerStats, weapon, onCombatEnd }) 
         playerMaxHp: playerStats.maxHp,
         playerQi: playerStats.qi,
         playerAttack: playerStats.attack,
+        playerDefense: playerStats.defense,
         critChance: playerStats.critChance,
+        critPower: playerStats.critPower,
         enemy,
         weapon,
+        innerArt,
+        movementArt,
+        techniques: techniques || [],
+        relics: relics || [],
+        activeSynergies,
+        burningMeridianStacks: burningMeridianStacks || 0,
         onCombatEnd: (result) => {
           game.destroy(true);
           onCombatEnd(result);
@@ -107,6 +130,11 @@ export default function PhaserGame({ enemy, playerStats, weapon, onCombatEnd }) 
     if (scene && scene.useSkill1) scene.useSkill1();
   };
 
+  const handleSkill2 = () => {
+    const scene = sceneRef.current;
+    if (scene && scene.useSkill2) scene.useSkill2();
+  };
+
   const handleUltimate = () => {
     const scene = sceneRef.current;
     if (scene && scene.useUltimate) scene.useUltimate();
@@ -118,7 +146,11 @@ export default function PhaserGame({ enemy, playerStats, weapon, onCombatEnd }) 
   };
 
   const skill1Pct = cooldowns.skill1 > 0 ? ((cooldowns.skill1Max - cooldowns.skill1) / cooldowns.skill1Max) * 100 : 100;
+  const skill2Pct = cooldowns.skill2 > 0 ? ((cooldowns.skill2Max - cooldowns.skill2) / cooldowns.skill2Max) * 100 : 100;
+  const dashPct = cooldowns.dash > 0 ? ((cooldowns.dashMax - cooldowns.dash) / cooldowns.dashMax) * 100 : 100;
   const ultPct = combatStats.playerQi / (combatStats.playerMaxQi || 100) * 100;
+  const skill2Name = innerArt?.ultimate?.name || 'Skill 2';
+  const skill2Disabled = cooldowns.skill2 > 0;
 
   return (
     <div style={STYLES.wrapper}>
@@ -126,7 +158,7 @@ export default function PhaserGame({ enemy, playerStats, weapon, onCombatEnd }) 
       <div style={STYLES.controls}>
         <div style={{ textAlign: 'center' }}>
           <button
-            style={{ ...STYLES.btn, ...(cooldowns.skill1 > 0 ? STYLES.btnDisabled : {}) }}
+            style={{ ...STYLES.btn, ...(cooldowns.skill1 > 0 ? STYLES.btnDisabled : {}), ...(cooldowns.interruptWindow ? { borderColor: '#ff8800', boxShadow: '0 0 6px #ff880088' } : {}) }}
             onClick={handleSkill1}
             disabled={cooldowns.skill1 > 0}
           >
@@ -136,9 +168,27 @@ export default function PhaserGame({ enemy, playerStats, weapon, onCombatEnd }) 
           <div style={{ ...STYLES.cooldownBar, width: `${skill1Pct}%` }} />
         </div>
         <div style={{ textAlign: 'center' }}>
-          <button style={STYLES.btn} onClick={handleDash}>
-            Dash
+          <button
+            style={{ ...STYLES.btn, ...STYLES.btnSkill2, ...(skill2Disabled ? STYLES.btnDisabled : {}) }}
+            onClick={handleSkill2}
+            disabled={skill2Disabled}
+          >
+            {skill2Name}
+            {cooldowns.skill2 > 0 && <span style={{ display: 'block', fontSize: '10px' }}>{cooldowns.skill2.toFixed(1)}s</span>}
+            {innerArt?.id === 'burningMeridian' && <span style={{ display: 'block', fontSize: '10px', color: '#ff8800' }}>🔥×{cooldowns.burningStacks}</span>}
           </button>
+          <div style={{ ...STYLES.cooldownBar, background: '#4a8bcc', width: `${skill2Pct}%` }} />
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <button
+            style={{ ...STYLES.btn, ...STYLES.btnDash, ...(cooldowns.dash > 0 ? STYLES.btnDisabled : {}) }}
+            onClick={handleDash}
+            disabled={cooldowns.dash > 0}
+          >
+            {movementArt?.name || 'Dash'}
+            {cooldowns.dash > 0 && <span style={{ display: 'block', fontSize: '10px' }}>{cooldowns.dash.toFixed(1)}s</span>}
+          </button>
+          <div style={{ ...STYLES.cooldownBar, background: '#4a8b4a', width: `${dashPct}%` }} />
         </div>
         <div style={{ textAlign: 'center' }}>
           <button

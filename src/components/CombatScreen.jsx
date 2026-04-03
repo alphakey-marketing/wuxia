@@ -33,7 +33,48 @@ const S = {
     border: '1px solid #c8a96e44',
     borderRadius: '4px',
     overflow: 'hidden'
-  }
+  },
+  relicStrip: {
+    display: 'flex',
+    gap: '6px',
+    justifyContent: 'center',
+    padding: '6px',
+    background: 'rgba(26,18,8,0.8)',
+    borderTop: '1px solid #c8a96e22'
+  },
+  relicIcon: {
+    fontSize: '16px',
+    padding: '2px 4px',
+    background: '#2a1e10',
+    border: '1px solid #c8a96e33',
+    borderRadius: '2px',
+    cursor: 'default',
+    minWidth: '28px',
+    textAlign: 'center'
+  },
+  karmaBar: {
+    display: 'flex',
+    gap: '8px',
+    justifyContent: 'center',
+    padding: '4px 8px',
+    background: 'rgba(26,18,8,0.8)'
+  },
+  karmaDot: (val) => ({
+    width: '8px',
+    height: '8px',
+    borderRadius: '50%',
+    background: val > 0 ? '#6abf6a' : val < 0 ? '#bf6a6a' : '#555',
+    border: `1px solid ${val > 0 ? '#4a8b4a' : val < 0 ? '#8b4a4a' : '#444'}`,
+    display: 'inline-block'
+  }),
+  karmaLabel: { fontSize: '9px', color: '#c8a96e55', letterSpacing: '0.05em' }
+};
+
+const KARMA_LABELS = { mercy: '仁', honor: '義', ambition: '志', orthodoxy: '道', renown: '名' };
+const RELIC_TYPE_ICONS = {
+  Offensive: '⚔', Defensive: '🛡', Sustain: '💚', Counter: '↩', Technique: '📜',
+  Economy: '💰', Frost: '❄', Fire: '🔥', Shadow: '👤', AoE: '💥',
+  Thunder: '⚡', Pierce: '🔱', Utility: '✨', Manual: '📖', Meta: '🌟'
 };
 
 export default function CombatScreen() {
@@ -74,8 +115,30 @@ export default function CombatScreen() {
           enemy={currentEnemy}
           playerStats={runState}
           weapon={runState.weapon}
+          innerArt={runState.innerArt}
+          movementArt={runState.movementArt}
+          techniques={runState.techniques}
+          relics={runState.relics}
+          burningMeridianStacks={runState.burningMeridianStacks}
           onCombatEnd={handleCombatEnd}
         />
+        {runState.relics.length > 0 && (
+          <div style={S.relicStrip}>
+            {runState.relics.map(r => (
+              <div key={r.id} style={S.relicIcon} title={`${r.name}: ${r.description}`}>
+                {RELIC_TYPE_ICONS[r.type] || '💎'}
+              </div>
+            ))}
+          </div>
+        )}
+        <div style={S.karmaBar}>
+          {Object.entries(runState.karma).map(([k, v]) => (
+            <div key={k} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+              <div style={S.karmaDot(v)} title={`${k}: ${v > 0 ? '+' : ''}${v}`} />
+              <span style={S.karmaLabel}>{KARMA_LABELS[k] || k}</span>
+            </div>
+          ))}
+        </div>
       </div>
       <div style={{ marginTop: '10px', fontSize: '11px', color: '#c8a96e44', textAlign: 'center' }}>
         {currentEnemy.behavior}

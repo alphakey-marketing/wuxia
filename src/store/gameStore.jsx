@@ -30,6 +30,12 @@ const DEFAULT_RUN_STATE = {
   nodeMap: [],
   qiBreakthroughs: 0,
   burningMeridianStacks: 0,
+  run_flags: {},
+  activeSynergies: [],
+  stancePoints: 0,
+  frozenHeartCooldown: 0,
+  flowingRiverLastDodgeTime: 0,
+  bloodWolfHitCounter: 0,
   combatStats: { enemiesDefeated: 0, bossesDefeated: 0, totalDamage: 0 }
 };
 
@@ -40,6 +46,14 @@ const DEFAULT_META_STATE = {
   inheritedTrait: null,
   fateImprint: null,
   memorySeal: null,
+  manualCollection: {},
+  reputationImprint: null,
+  lifetimeStats: {
+    totalEnemiesKilled: 0,
+    totalBossesDefeated: 0,
+    furthestNodeReached: 0,
+    bestRunDamage: 0
+  },
   runHistory: []
 };
 
@@ -55,7 +69,9 @@ function loadMeta() {
 function saveMeta(meta) {
   try {
     localStorage.setItem('wuxia_meta', JSON.stringify(meta));
-  } catch {}
+  } catch {
+    // Storage unavailable — continue without persisting
+  }
 }
 
 const initialState = {
@@ -78,6 +94,12 @@ function gameReducer(state, action) {
       let maxHp = 120;
       if (state.metaState.unlockedItems.includes('healerBloodline')) maxHp += 30;
       if (state.metaState.unlockedItems.includes('R01')) maxHp += 25;
+      // Fate Imprint effects
+      const imprint = state.metaState.fateImprint;
+      if (imprint === 'compassionate') {
+        // One extra healer node — handled in node generation; give HP bonus here
+        maxHp += 10;
+      }
       const runState = {
         ...DEFAULT_RUN_STATE,
         maxHp,
@@ -90,7 +112,8 @@ function gameReducer(state, action) {
         silver: 50,
         nodeMap,
         techniques: state.metaState.inheritedManual ? [state.metaState.inheritedManual] : [],
-        relics: []
+        relics: [],
+        run_flags: {}
       };
       return { ...state, runState, gamePhase: 'nodeMap' };
     }
@@ -107,16 +130,18 @@ function gameReducer(state, action) {
         currentEnemy = generateEnemy(node.type, state.runState);
       } else if (node.type === 'event' || node.type === 'majorEvent' || node.type === 'wanderingMaster' || node.type === 'sectTrial' || node.type === 'hiddenCave') {
         gamePhase = 'event';
-        pendingEvent = selectEvent(node.type);
+        pendingEvent = selectEvent(node.type, state.runState);
       } else if (node.type === 'healer') {
         gamePhase = 'healer';
+      } else if (node.type === 'blackMarket') {
+        gamePhase = 'blackMarket';
       } else if (node.type === 'manualPage') {
         gamePhase = 'reward';
       }
       return { ...state, runState: newRunState, gamePhase, currentEnemy, pendingEvent };
     }
     case 'COMPLETE_COMBAT': {
-      const { victory, damageDealt, silverGained, essenceGained } = action.payload;
+      const { victory, damageDealt, silverGained, essenceGained, remainingHp, burningMeridianStacks } = action.payload;
       if (!victory) {
         const newMeta = {
           ...state.metaState,
@@ -125,10 +150,12 @@ function gameReducer(state, action) {
         saveMeta(newMeta);
         return { ...state, metaState: newMeta, gamePhase: 'legacy' };
       }
-      const newStacks = state.runState.innerArt?.id === 'burningMeridian'
-        ? Math.min((state.runState.burningMeridianStacks || 0) + 1, 10) : state.runState.burningMeridianStacks;
+      const newStacks = burningMeridianStacks !== undefined ? burningMeridianStacks :
+        (state.runState.innerArt?.id === 'burningMeridian'
+          ? Math.min((state.runState.burningMeridianStacks || 0) + 1, 10) : state.runState.burningMeridianStacks);
       const newRunState = {
         ...state.runState,
+        hp: remainingHp !== undefined ? remainingHp : state.runState.hp,
         silver: state.runState.silver + (silverGained || 0),
         legacyEssence: state.runState.legacyEssence + (essenceGained || 0),
         burningMeridianStacks: newStacks,
@@ -176,9 +203,29 @@ function gameReducer(state, action) {
     }
     case 'END_RUN': {
       const runRecord = { ...state.runState.combatStats, karma: state.runState.karma, silver: state.runState.silver };
+      // Fate Imprint: dominant karma axis at ≥ +2 or ≤ -2
+      const karma = state.runState.karma;
+      let fateImprint = null;
+      if (karma.mercy >= 2) fateImprint = 'compassionate';
+      else if (karma.mercy <= -2) fateImprint = 'blood_handed';
+      else if (karma.honor >= 2) fateImprint = 'righteous';
+      else if (karma.honor <= -2) fateImprint = 'schemer';
+      else if (karma.ambition >= 2) fateImprint = 'driven';
+      else if (karma.orthodoxy >= 2) fateImprint = 'grandmaster';
+      else if (karma.orthodoxy <= -2) fateImprint = 'forbidden';
+      else if (karma.renown >= 2) fateImprint = 'legend';
+      else if (karma.renown <= -2) fateImprint = 'feared';
+      const lifetimeStats = {
+        totalEnemiesKilled: (state.metaState.lifetimeStats?.totalEnemiesKilled || 0) + state.runState.combatStats.enemiesDefeated,
+        totalBossesDefeated: (state.metaState.lifetimeStats?.totalBossesDefeated || 0) + (state.runState.combatStats.bossesDefeated || 0),
+        furthestNodeReached: Math.max(state.metaState.lifetimeStats?.furthestNodeReached || 0, state.runState.currentNode),
+        bestRunDamage: Math.max(state.metaState.lifetimeStats?.bestRunDamage || 0, state.runState.combatStats.totalDamage)
+      };
       const newMeta = {
         ...state.metaState,
         legacyEssence: state.metaState.legacyEssence + state.runState.legacyEssence,
+        fateImprint,
+        lifetimeStats,
         runHistory: [...state.metaState.runHistory, runRecord]
       };
       saveMeta(newMeta);
@@ -186,7 +233,26 @@ function gameReducer(state, action) {
     }
     case 'CHOOSE_INHERITANCE': {
       const { manual, trait } = action.payload;
-      const newMeta = { ...state.metaState, inheritedManual: manual, inheritedTrait: trait };
+      // Track manual collection for Chapter II promotion
+      let manualCollection = { ...state.metaState.manualCollection };
+      if (manual) {
+        const prev = state.metaState.inheritedManual;
+        const existing = manualCollection[manual.id] || { chapter: 1, consecutiveCount: 0 };
+        const isSame = prev && prev.id === manual.id;
+        const newCount = isSame ? existing.consecutiveCount + 1 : 1;
+        let chapter = existing.chapter;
+        let resolvedManual = manual;
+        if (newCount >= 3 && chapter < 2 && state.metaState.unlockedItems.includes('manualTierII')) {
+          chapter = 2;
+          // Promote technique to Chapter II by marking it
+          resolvedManual = { ...manual, chapter: 2, name: manual.name + ' II', description: (manual.upgradeII || manual.description) };
+        }
+        manualCollection[manual.id] = { chapter, consecutiveCount: newCount };
+        const newMeta = { ...state.metaState, inheritedManual: resolvedManual, inheritedTrait: trait, manualCollection };
+        saveMeta(newMeta);
+        return { ...state, metaState: newMeta, gamePhase: 'title' };
+      }
+      const newMeta = { ...state.metaState, inheritedManual: manual, inheritedTrait: trait, manualCollection };
       saveMeta(newMeta);
       return { ...state, metaState: newMeta, gamePhase: 'title' };
     }
@@ -211,6 +277,25 @@ function gameReducer(state, action) {
         hp: Math.min(state.runState.maxHp, state.runState.hp + healAmount)
       };
       return { ...state, runState: newRunState, gamePhase: 'nodeMap' };
+    }
+    case 'BUY_FROM_MARKET': {
+      const { item, cost, itemType } = action.payload;
+      if (state.runState.silver < cost) return state;
+      let newRunState = { ...state.runState, silver: state.runState.silver - cost };
+      if (itemType === 'relic' && newRunState.relics.length < 4) {
+        newRunState.relics = [...newRunState.relics, item];
+        if (item.id === 'R01') newRunState.maxHp += 25;
+      } else if (itemType === 'technique' && newRunState.techniques.length < 6) {
+        newRunState.techniques = [...newRunState.techniques, item];
+      }
+      return { ...state, runState: newRunState };
+    }
+    case 'SET_RUN_FLAG': {
+      const newRunState = {
+        ...state.runState,
+        run_flags: { ...state.runState.run_flags, [action.payload.flag]: action.payload.value }
+      };
+      return { ...state, runState: newRunState };
     }
     case 'SET_PHASE': {
       return { ...state, gamePhase: action.payload };
@@ -239,22 +324,51 @@ function gameReducer(state, action) {
 }
 
 function generateEnemy(nodeType, runState) {
+  // Phase-based difficulty multipliers
+  const node = runState.currentNode || 0;
+  let hpMult = 1.0;
+  let atkMult = 1.0;
+  if (node <= 2) { hpMult = 1.0; atkMult = 1.0; }
+  else if (node <= 6) { hpMult = 1.4; atkMult = 1.3; }
+  else { hpMult = 1.8; atkMult = 1.6; }
+  // Sect Archive scaling: +5% per phase if 3+ items unlocked, +10% if 8+
+  const unlockedCount = (runState.unlockedItems || []).length;
+  if (unlockedCount >= 8) { hpMult *= 1.10; atkMult *= 1.10; }
+  else if (unlockedCount >= 3) { hpMult *= 1.05; atkMult *= 1.05; }
+  const scale = (enemy) => ({
+    ...enemy,
+    hp: Math.round(enemy.hp * hpMult),
+    attack: Math.round(enemy.attack * atkMult)
+  });
   if (nodeType === 'boss') {
-    return BOSSES['B01'];
+    // Randomly pick B01 or B02 (B02 requires unlock)
+    const hasBossUnlock = (runState.unlockedItems || []).includes('B02') || true; // B02 available after SA09
+    const bossPool = hasBossUnlock ? ['B01', 'B02'] : ['B01'];
+    const pick = bossPool[Math.floor(Math.random() * bossPool.length)];
+    const boss = BOSSES[pick];
+    return { ...boss, hp: Math.round(boss.hp * 3.0), attack: Math.round(boss.attack * 2.0) };
   }
-  if (nodeType === 'elite') {
+  if (nodeType === 'elite' || nodeType === 'ambush') {
     const elites = Object.values(ENEMIES).filter(e => e.type === 'elite');
-    return elites[Math.floor(Math.random() * elites.length)];
+    return scale(elites[Math.floor(Math.random() * elites.length)]);
   }
   const standards = Object.values(ENEMIES).filter(e => e.type === 'standard');
-  return standards[Math.floor(Math.random() * standards.length)];
+  return scale(standards[Math.floor(Math.random() * standards.length)]);
 }
 
-function selectEvent(nodeType) {
-  if (nodeType === 'wanderingMaster') return EVENTS.find(e => e.id === 'E_WANDERING_MASTER') || EVENTS[0];
-  if (nodeType === 'sectTrial') return EVENTS.find(e => e.id === 'E_SECT_TRIAL') || EVENTS[0];
-  if (nodeType === 'hiddenCave') return EVENTS.find(e => e.id === 'E_FORBIDDEN_CAVE') || EVENTS[0];
-  return EVENTS[Math.floor(Math.random() * EVENTS.length)];
+function selectEvent(nodeType, runState) {
+  const flags = runState?.run_flags || {};
+  let pool = [...EVENTS];
+  // Filter out events blocked by run flags
+  if (flags.joined_black_cliff) pool = pool.filter(e => e.id !== 'E_SECT_INVITATION');
+  if (nodeType === 'wanderingMaster') return pool.find(e => e.id === 'E_WANDERING_MASTER') || pool[0];
+  if (nodeType === 'sectTrial') return pool.find(e => e.id === 'E_SECT_TRIAL') || pool[0];
+  if (nodeType === 'hiddenCave') return pool.find(e => e.id === 'E_FORBIDDEN_CAVE') || pool[0];
+  if (nodeType === 'majorEvent') {
+    const major = pool.filter(e => ['E_BURNING_VILLAGE', 'E_RIVAL_ENCOUNTER', 'E_PRISONER'].includes(e.id));
+    return major[Math.floor(Math.random() * major.length)] || pool[0];
+  }
+  return pool[Math.floor(Math.random() * pool.length)];
 }
 
 function generateRewards(runState) {
@@ -285,6 +399,8 @@ export function GameProvider({ children }) {
     healAtHealer: (cost) =>
       dispatch({ type: 'HEAL_AT_HEALER', payload: { cost } }),
     setPhase: (phase) => dispatch({ type: 'SET_PHASE', payload: phase }),
+    setRunFlag: (flag, value) => dispatch({ type: 'SET_RUN_FLAG', payload: { flag, value } }),
+    buyFromMarket: (item, cost, itemType) => dispatch({ type: 'BUY_FROM_MARKET', payload: { item, cost, itemType } }),
     updateHp: (hp) => dispatch({ type: 'UPDATE_HP', payload: hp }),
     updateQi: (qi) => dispatch({ type: 'UPDATE_QI', payload: qi })
   };

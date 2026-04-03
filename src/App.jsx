@@ -8,6 +8,8 @@ import RewardDraft from './components/RewardDraft.jsx';
 import LegacyScreen from './components/LegacyScreen.jsx';
 import SectArchive from './components/SectArchive.jsx';
 import HealerNode from './components/HealerNode.jsx';
+import BlackMarketScreen from './components/BlackMarketScreen.jsx';
+import WanderingMasterScreen from './components/WanderingMasterScreen.jsx';
 
 const SCREEN_MAP = {
   title: TitleScreen,
@@ -18,7 +20,9 @@ const SCREEN_MAP = {
   reward: RewardDraft,
   legacy: LegacyScreen,
   sectArchive: SectArchive,
-  healer: HealerNode
+  healer: HealerNode,
+  blackMarket: BlackMarketScreen,
+  wanderingMaster: WanderingMasterScreen
 };
 
 function GameRouter() {
