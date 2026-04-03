@@ -341,8 +341,8 @@ function generateEnemy(nodeType, runState) {
     attack: Math.round(enemy.attack * atkMult)
   });
   if (nodeType === 'boss') {
-    // Randomly pick B01 or B02 (B02 requires unlock)
-    const hasBossUnlock = (runState.unlockedItems || []).includes('B02') || true; // B02 available after SA09
+    // Randomly pick B01 or B02; B02 requires SA09 unlock
+    const hasBossUnlock = (runState.unlockedItems || []).includes('B02');
     const bossPool = hasBossUnlock ? ['B01', 'B02'] : ['B01'];
     const pick = bossPool[Math.floor(Math.random() * bossPool.length)];
     const boss = BOSSES[pick];
