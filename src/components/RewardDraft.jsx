@@ -81,7 +81,7 @@ export default function RewardDraft() {
     return (
       <div style={S.container}>
         <p>No rewards available.</p>
-        <button onClick={() => actions.setPhase('nodeMap')} style={{ color: '#e8c87e', background: 'none', border: '1px solid #c8a96e', padding: '10px 20px', cursor: 'pointer', fontFamily: 'serif' }}>
+        <button onClick={() => actions.leaveNode()} style={{ color: '#e8c87e', background: 'none', border: '1px solid #c8a96e', padding: '10px 20px', cursor: 'pointer', fontFamily: 'serif' }}>
           Continue
         </button>
       </div>

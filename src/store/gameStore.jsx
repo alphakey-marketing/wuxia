@@ -167,6 +167,7 @@ function gameReducer(state, action) {
       let gamePhase = state.gamePhase;
       let currentEnemy = null;
       let pendingEvent = null;
+      let pendingRewards = state.pendingRewards;
       if (node.type === 'combat' || node.type === 'elite' || node.type === 'boss' || node.type === 'ambush') {
         gamePhase = 'combat';
         currentEnemy = generateEnemy(node.type, state.runState, state.metaState);
@@ -181,8 +182,9 @@ function gameReducer(state, action) {
         gamePhase = 'blackMarket';
       } else if (node.type === 'manualPage') {
         gamePhase = 'reward';
+        pendingRewards = generateRewardDraft(newRunState);
       }
-      return { ...state, runState: newRunState, gamePhase, currentEnemy, pendingEvent };
+      return { ...state, runState: newRunState, gamePhase, currentEnemy, pendingEvent, pendingRewards };
     }
     case 'CHOOSE_FORK': {
       const { nodeIndex, branchIndex } = action.payload;
@@ -203,6 +205,7 @@ function gameReducer(state, action) {
       let gamePhase = state.gamePhase;
       let currentEnemy = null;
       let pendingEvent = null;
+      let pendingRewards = state.pendingRewards;
       if (chosenBranch.type === 'combat' || chosenBranch.type === 'elite' || chosenBranch.type === 'boss' || chosenBranch.type === 'ambush') {
         gamePhase = 'combat';
         currentEnemy = generateEnemy(chosenBranch.type, newRunState, state.metaState);
@@ -215,8 +218,11 @@ function gameReducer(state, action) {
         gamePhase = 'healer';
       } else if (chosenBranch.type === 'blackMarket') {
         gamePhase = 'blackMarket';
+      } else if (chosenBranch.type === 'manualPage') {
+        gamePhase = 'reward';
+        pendingRewards = generateRewardDraft(newRunState);
       }
-      return { ...state, runState: newRunState, gamePhase, currentEnemy, pendingEvent };
+      return { ...state, runState: newRunState, gamePhase, currentEnemy, pendingEvent, pendingRewards };
     }
     case 'COMPLETE_COMBAT': {
       const { victory, damageDealt, silverGained, essenceGained, remainingHp, burningMeridianStacks, karmaBonus, bossId } = action.payload;
@@ -342,8 +348,13 @@ function gameReducer(state, action) {
         else if (reward.data.stat === 'attack') newRunState.attack += 3;
         else if (reward.data.stat === 'critChance') newRunState.critChance += 0.05;
       }
-      const nextNode = newRunState.currentNode + 1;
-      const atEnd = nextNode >= newRunState.nodeMap.length;
+      // For non-combat reward paths (e.g. manualPage), COMPLETE_COMBAT hasn't run,
+      // so activeNodeIndex hasn't been committed yet — do it here.
+      if (newRunState.activeNodeIndex !== null && newRunState.activeNodeIndex !== undefined) {
+        newRunState.currentNode = newRunState.activeNodeIndex;
+        newRunState.activeNodeIndex = null;
+      }
+      const atEnd = newRunState.currentNode >= newRunState.nodeMap.length - 1;
       return { ...state, runState: newRunState, gamePhase: atEnd ? 'legacy' : 'nodeMap', pendingRewards: null };
     }
     case 'END_RUN': {
