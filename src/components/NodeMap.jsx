@@ -136,18 +136,17 @@ export default function NodeMap() {
   const renderForkNode = (node, nodeIdx) => {
     const forkKey = `fork_${nodeIdx}`;
     const chosenBranch = runState.run_flags[forkKey];
-    const isForkCurrent = isCurrent(nodeIdx);
     const forkTravelable = canTravel(nodeIdx);
     return (
       <div style={S.forkWrapper} title="Fork — choose your path">
         {node.branches.map((branch, bi) => {
           const isChosen = chosenBranch === bi;
           const isLocked = chosenBranch !== undefined && chosenBranch !== bi;
-          const canClick = forkTravelable && isCurrent(nodeIdx) && chosenBranch === undefined;
+          const canClick = forkTravelable && chosenBranch === undefined;
           return (
             <div
               key={bi}
-              style={S.forkBranch(isChosen, isLocked || (!forkTravelable && !isCurrent(nodeIdx)))}
+              style={S.forkBranch(isChosen, isLocked || !forkTravelable)}
               onClick={() => canClick && actions.chooseFork(nodeIdx, bi)}
             >
               <div style={S.forkBranchHeader}>
@@ -159,7 +158,7 @@ export default function NodeMap() {
             </div>
           );
         })}
-        {isForkCurrent && chosenBranch === undefined && (
+        {forkTravelable && chosenBranch === undefined && (
           <div style={{ fontSize: '9px', color: '#ff8800', textAlign: 'center', marginTop: '2px' }}>↑ Choose a path</div>
         )}
       </div>

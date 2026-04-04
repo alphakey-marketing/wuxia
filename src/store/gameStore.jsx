@@ -453,6 +453,15 @@ function gameReducer(state, action) {
       };
       return { ...state, runState: newRunState };
     }
+    case 'LEAVE_NODE': {
+      const clearedNode = state.runState.activeNodeIndex;
+      const newRunState = {
+        ...state.runState,
+        currentNode: clearedNode !== null && clearedNode !== undefined ? clearedNode : state.runState.currentNode,
+        activeNodeIndex: null
+      };
+      return { ...state, runState: newRunState, gamePhase: 'nodeMap' };
+    }
     case 'SET_PHASE': {
       return { ...state, gamePhase: action.payload };
     }
@@ -567,6 +576,7 @@ export function GameProvider({ children }) {
     healAtHealer: (cost) =>
       dispatch({ type: 'HEAL_AT_HEALER', payload: { cost } }),
     setPhase: (phase) => dispatch({ type: 'SET_PHASE', payload: phase }),
+    leaveNode: () => dispatch({ type: 'LEAVE_NODE' }),
     setRunFlag: (flag, value) => dispatch({ type: 'SET_RUN_FLAG', payload: { flag, value } }),
     chooseFork: (nodeIndex, branchIndex) => dispatch({ type: 'CHOOSE_FORK', payload: { nodeIndex, branchIndex } }),
     buyFromMarket: (item, cost, itemType) => dispatch({ type: 'BUY_FROM_MARKET', payload: { item, cost, itemType } }),

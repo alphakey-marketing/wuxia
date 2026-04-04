@@ -109,7 +109,7 @@ export default function HealerNode() {
           );
         })}
 
-        <button style={S.passBtn} onClick={() => actions.setPhase('nodeMap')}>
+        <button style={S.passBtn} onClick={() => actions.leaveNode()}>
           Continue without treatment
         </button>
       </div>

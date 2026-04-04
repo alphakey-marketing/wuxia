@@ -122,7 +122,7 @@ export default function BlackMarketScreen() {
   };
 
   const handleLeave = () => {
-    actions.setPhase('nodeMap');
+    actions.leaveNode();
   };
 
   return (
