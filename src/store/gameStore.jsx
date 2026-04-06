@@ -115,7 +115,15 @@ function gameReducer(state, action) {
         silver: 50,
         nodeMap,
         maxTechniques: 6,
-        techniques: state.metaState.inheritedManual ? [state.metaState.inheritedManual] : [],
+        techniques: (() => {
+          // Each weapon grants an occupation-signature starting technique
+          const weaponStartTechs = { sword: 'T01', spear: 'T05', fists: 'T09' };
+          const startTechId = weaponStartTechs[weapon];
+          const startTech = startTechId ? TECHNIQUES[startTechId] : null;
+          const inherited = state.metaState.inheritedManual ? [state.metaState.inheritedManual] : [];
+          if (startTech && !inherited.find(t => t.id === startTechId)) return [startTech, ...inherited];
+          return inherited;
+        })(),
         relics: [],
         run_flags: {}
       };
@@ -528,8 +536,8 @@ function generateEnemy(nodeType, runState, metaState) {
     const bossPool = hasBossUnlock ? ['B01', 'B02'] : ['B01'];
     const pick = bossPool[Math.floor(Math.random() * bossPool.length)];
     const boss = BOSSES[pick];
-    let bossHpMult = 3.0;
-    let bossAtkMult = 2.0;
+    let bossHpMult = 2.0;
+    let bossAtkMult = 1.5;
     if (flags.driven_boss_boost) bossHpMult *= 1.10;
     return { ...boss, hp: Math.round(boss.hp * bossHpMult), attack: Math.round(boss.attack * bossAtkMult) };
   }

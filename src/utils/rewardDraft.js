@@ -12,8 +12,15 @@ export function generateRewardDraft(runState, count = 3) {
 
 export function generateRewardOfType(type, runState) {
   if (type === 'newTechnique') {
-    const available = Object.values(TECHNIQUES).filter(t => !runState.techniques.find(rt => rt.id === t.id) && t.category !== 'rare');
-    const t = available[Math.floor(Math.random() * available.length)] || Object.values(TECHNIQUES)[0];
+    const weaponCategory = runState.weapon?.id; // 'sword', 'spear', or 'fists'
+    const allAvailable = Object.values(TECHNIQUES).filter(t => !runState.techniques.find(rt => rt.id === t.id) && t.category !== 'rare');
+    // Prefer techniques matching the player's weapon category (occupation-specific),
+    // then fall back to innerArt (universal), then any remaining
+    const weaponMatched = allAvailable.filter(t => t.category === weaponCategory);
+    const innerArtFallback = allAvailable.filter(t => t.category === 'innerArt');
+    const pool = weaponMatched.length > 0 ? weaponMatched
+      : (innerArtFallback.length > 0 ? innerArtFallback : allAvailable);
+    const t = pool[Math.floor(Math.random() * pool.length)] || Object.values(TECHNIQUES)[0];
     return { type: 'newTechnique', data: t, label: 'New Technique', description: t.description };
   }
   if (type === 'relic') {

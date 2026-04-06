@@ -3,6 +3,10 @@ import { useGame } from '../store/gameStore.jsx';
 import { WEAPONS } from '../data/weapons.js';
 import { INNER_ARTS } from '../data/innerArts.js';
 import { MOVEMENT_ARTS } from '../data/movementArts.js';
+import { TECHNIQUES } from '../data/techniques.js';
+
+// Occupation signature starting techniques (must match gameStore START_NEW_RUN)
+const WEAPON_START_TECH = { sword: 'T01', spear: 'T05', fists: 'T09' };
 
 const LINEAGES = [
   {
@@ -144,6 +148,7 @@ export default function LineageSelect() {
           const weaponData = WEAPONS[lineage.weapon];
           const artData = INNER_ARTS[lineage.innerArt];
           const movData = MOVEMENT_ARTS[lineage.movementArt];
+          const startTech = TECHNIQUES[WEAPON_START_TECH[lineage.weapon]];
           return (
             <div
               key={lineage.id}
@@ -171,6 +176,12 @@ export default function LineageSelect() {
               </div>
               <p style={S.description}>{lineage.description}</p>
               <p style={S.flavor}>{lineage.flavor}</p>
+              {startTech && (
+                <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #c8a96e22', fontSize: '11px' }}>
+                  <span style={{ color: '#c8a96e88' }}>Signature Technique: </span>
+                  <span style={{ color: '#e8c87e' }}>{startTech.name}</span>
+                </div>
+              )}
               {locked && (
                 <p style={S.lockedMsg}>🔒 Unlock in Sect Archive</p>
               )}
@@ -184,7 +195,7 @@ export default function LineageSelect() {
           <h3 style={{ color: '#e8c87e', marginBottom: '12px' }}>
             {selectedLineage.name} — Build Details
           </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '15px' }}>
             <div>
               <div style={{ color: '#c8a96e', fontSize: '13px', marginBottom: '6px' }}>⚔ Weapon</div>
               <div style={{ color: '#e8c87e', fontSize: '14px' }}>{WEAPONS[selectedLineage.weapon].name}</div>
@@ -194,6 +205,23 @@ export default function LineageSelect() {
               <div style={{ color: '#e8c87e', fontSize: '12px', marginTop: '8px' }}>
                 Skill: {WEAPONS[selectedLineage.weapon].skill.name}
               </div>
+            </div>
+            <div>
+              <div style={{ color: '#c8a96e', fontSize: '13px', marginBottom: '6px' }}>📜 Signature Technique</div>
+              {(() => {
+                const t = TECHNIQUES[WEAPON_START_TECH[selectedLineage.weapon]];
+                return t ? (
+                  <>
+                    <div style={{ color: '#e8c87e', fontSize: '14px' }}>{t.name}</div>
+                    <div style={{ color: '#c8a96eaa', fontSize: '11px', marginTop: '4px' }}>{t.description}</div>
+                    <div style={{ marginTop: '6px' }}>
+                      {t.tags.map(tag => (
+                        <span key={tag} style={{ ...S.tag, fontSize: '10px', marginRight: '3px' }}>{tag}</span>
+                      ))}
+                    </div>
+                  </>
+                ) : null;
+              })()}
             </div>
             <div>
               <div style={{ color: '#c8a96e', fontSize: '13px', marginBottom: '6px' }}>🌊 Inner Art</div>
