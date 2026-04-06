@@ -119,6 +119,18 @@ export default function PhaserGame({ enemy, playerStats, weapon, innerArt, movem
     game.events.on('cooldownUpdate', (data) => setCooldowns(data));
     game.events.on('statsUpdate', (data) => setCombatStats(data));
 
+    // Non-boss victory (standard / elite) — transition out of combat
+    game.events.on('combatVictory', (result) => {
+      game.destroy(true);
+      onCombatEndRef.current(result);
+    });
+
+    // Defeat — transition to legacy screen
+    game.events.on('combatDefeat', (result) => {
+      game.destroy(true);
+      onCombatEndRef.current(result);
+    });
+
     // Boss karma dialogue intercept — use ref to avoid stale closure
     game.events.on('bossDefeated', (result) => {
       const karma = playerStatsRef.current?.karma || {};

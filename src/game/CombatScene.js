@@ -228,14 +228,16 @@ export class CombatScene extends Phaser.Scene {
       }).setOrigin(1, 0.5);
     }
 
-    // ── ENEMY SPRITE (rectangle + decoration) ────────────────────
-    const enemyColor = this.enemyData.type === 'boss' ? 0x8b1a1a : this.enemyData.type === 'elite' ? 0x6b2a6b : 0x6b4a2a;
+    // ── ENEMY CHARACTER (human-like Graphics silhouette) ──────────
     const eW = this.enemyData.type === 'boss' ? 78 : this.enemyData.type === 'elite' ? 64 : 54;
     const eHs = this.enemyData.type === 'boss' ? 100 : this.enemyData.type === 'elite' ? 86 : 72;
-    this.enemySprite = this.add.rectangle(W / 2, H * 0.38, eW, eHs, enemyColor);
-    this.enemySprite.setStrokeStyle(2, 0xc8a96e, 0.7);
-    // Decorative layer drawn on top
-    this.drawEnemyDecoration(W / 2, H * 0.38, this.enemyData.type, eW, eHs);
+    this.enemyW = eW;
+    this.enemyH = eHs;
+    // Draw the character; returns a Graphics object positioned at (W/2, H*0.38)
+    this.enemySprite = this.drawEnemyCharacter(W / 2, H * 0.38, this.enemyData.type, eW, eHs);
+    // Separate freeze-tint overlay (hidden by default)
+    this.enemyFreezeOverlay = this.add.rectangle(W / 2, H * 0.38, eW + 12, eHs + 8, 0x88aaff, 0.45);
+    this.enemyFreezeOverlay.setVisible(false);
 
     // ── PLAYER SPRITE (hero.png) ──────────────────────────────────
     this.playerSprite = this.add.image(W / 2, H * 0.67, 'hero').setDisplaySize(54, 76);
@@ -278,9 +280,10 @@ export class CombatScene extends Phaser.Scene {
     const introFlash = this.add.rectangle(W / 2, H / 2, W, H, 0xffffff, 0.6);
     this.tweens.add({ targets: introFlash, alpha: 0, duration: 350, onComplete: () => introFlash.destroy() });
 
-    // Enemy slides in from above
-    this.enemySprite.setY(-150);
-    this.tweens.add({ targets: this.enemySprite, y: H * 0.38, duration: 650, ease: 'Back.easeOut' });
+    // Enemy character fades in with slight scale pop
+    this.enemySprite.setAlpha(0);
+    this.enemySprite.setScale(0.75);
+    this.tweens.add({ targets: this.enemySprite, alpha: 1, scaleX: 1, scaleY: 1, duration: 580, delay: 60, ease: 'Back.easeOut' });
 
     // Player slides in from below
     this.playerSprite.setY(H + 80);
@@ -323,46 +326,155 @@ export class CombatScene extends Phaser.Scene {
     }
   }
 
-  // Draw decorative Graphics layer over the enemy rectangle to suggest a character silhouette
-  drawEnemyDecoration(x, y, type, w, h) {
+  // Draw a human-like wuxia warrior character using Phaser Graphics in LOCAL coordinates.
+  // The Graphics object is positioned at (cx, cy); all drawing commands use offsets from that origin.
+  drawEnemyCharacter(cx, cy, type, w, h) {
     const g = this.add.graphics();
-    const topY = y - h / 2;
+    g.setPosition(cx, cy); // Character center in world space; drawing is relative to (0,0)
+
+    const topY = -h / 2;
+    const botY = h / 2;
+    const headR = Math.round(h * 0.13);       // Head radius ~9-13 px
+    const headCY = topY + headR * 2 + 2;      // Head center Y (local)
+    const robeTop = headCY + headR + 3;       // Top of robe / body
+    const tHW = w * 0.25;                     // Robe half-width at top
+    const bHW = w * 0.44;                     // Robe half-width at bottom
+
+    // Color palette
+    const bodyC   = type === 'boss' ? 0x660000 : type === 'elite' ? 0x2a0048 : 0x3a2010;
+    const accentC = type === 'boss' ? 0xcc3333 : type === 'elite' ? 0x9933cc : 0x886633;
+    const skinC   = 0xd4956a;
+    const hairC   = type === 'boss' ? 0x1a0000 : type === 'elite' ? 0x120028 : 0x1a0e00;
+    const eyeC    = type === 'boss' ? 0xff2200 : type === 'elite' ? 0xcc44ff : 0xff8800;
+    const weaponC = type === 'boss' ? 0xccaa44 : type === 'elite' ? 0xaa99cc : 0x998866;
+
+    // Ground shadow
+    g.fillStyle(0x000000, 0.2);
+    g.fillEllipse(0, botY + 3, w * 0.7, 7);
+
+    // ── BOSS GLAIVE (behind body) ───────────────────────────────
     if (type === 'boss') {
-      // Crown spikes
-      g.fillStyle(0xf0d060, 1);
-      g.fillTriangle(x - 16, topY, x, topY - 20, x + 16, topY);
-      g.fillTriangle(x - 8, topY, x - 8, topY - 12, x + 8, topY - 12);
-      // Glowing eyes
-      g.fillStyle(0xff3333, 1);
-      g.fillCircle(x - 9, topY + 14, 5);
-      g.fillCircle(x + 9, topY + 14, 5);
-      g.fillStyle(0xff9999, 0.8);
-      g.fillCircle(x - 9, topY + 13, 2);
-      g.fillCircle(x + 9, topY + 13, 2);
-      // Shoulder pauldrons
-      g.fillStyle(0x6a1010, 0.9);
-      g.fillRect(x - w / 2 - 8, topY + 25, 10, 18);
-      g.fillRect(x + w / 2 - 2, topY + 25, 10, 18);
-    } else if (type === 'elite') {
-      // Diamond crest
-      g.fillStyle(0xcc88ff, 0.9);
-      g.fillTriangle(x, topY - 14, x + 9, topY - 4, x, topY + 6);
-      g.fillTriangle(x, topY - 14, x - 9, topY - 4, x, topY + 6);
-      // Eyes
-      g.fillStyle(0xdd66ff, 1);
-      g.fillCircle(x - 7, topY + 12, 4);
-      g.fillCircle(x + 7, topY + 12, 4);
-      g.fillStyle(0xffffff, 0.7);
-      g.fillCircle(x - 7, topY + 11, 1.5);
-      g.fillCircle(x + 7, topY + 11, 1.5);
-    } else {
-      // Standard bandit — simple eyes and a bandana line
-      g.fillStyle(0xffd8a0, 0.7);
-      g.fillCircle(x - 6, topY + 10, 3.5);
-      g.fillCircle(x + 6, topY + 10, 3.5);
-      g.lineStyle(2, 0xaa7733, 0.6);
-      g.lineBetween(x - w / 2 + 2, topY + 5, x + w / 2 - 2, topY + 5);
+      g.lineStyle(3, weaponC, 1);
+      g.lineBetween(-bHW * 0.3, robeTop + 6, -bHW * 0.75, botY - 6);
+      g.lineBetween(-bHW * 0.3, robeTop + 6, -bHW * 0.1, topY + 2);
+      g.fillStyle(weaponC, 1);
+      g.fillTriangle(-bHW * 0.45, topY, -bHW * 0.05, topY - 16, -bHW * 0.05, topY + 5);
     }
+
+    // ── ROBE (trapezoid = two triangles) ────────────────────────
+    g.fillStyle(bodyC, 1);
+    g.fillTriangle(-tHW, robeTop, tHW, robeTop, -bHW, botY);
+    g.fillTriangle(tHW, robeTop, -bHW, botY, bHW, botY);
+
+    // Collar V-overlap
+    g.fillStyle(accentC, 0.22);
+    g.fillTriangle(-tHW * 0.5, robeTop - 1, tHW * 0.5, robeTop - 1, 0, robeTop + Math.round(h * 0.2));
+
+    // Center seam
+    g.lineStyle(1, accentC, 0.4);
+    g.lineBetween(0, robeTop + 4, 0, botY - 4);
+
+    // Belt + knot
+    const beltY = robeTop + (botY - robeTop) * 0.38;
+    const beltHW = tHW + (bHW - tHW) * 0.38;
+    g.lineStyle(2, accentC, 0.9);
+    g.lineBetween(-beltHW + 2, beltY, beltHW - 2, beltY);
+    g.fillStyle(accentC, 0.85);
+    g.fillCircle(0, beltY, 3);
+
+    // Robe hem
+    g.lineStyle(1, accentC, 0.4);
+    g.lineBetween(-bHW + 2, botY, bHW - 2, botY);
+
+    // ── SHOULDER PAULDRONS (elite / boss) ───────────────────────
+    if (type === 'elite' || type === 'boss') {
+      const pX = tHW + 3;
+      g.fillStyle(accentC, 0.82);
+      g.fillTriangle(-pX, robeTop + 3, -pX - 10, robeTop + 6, -pX, robeTop + 18);
+      g.fillTriangle(pX, robeTop + 3, pX + 10, robeTop + 6, pX, robeTop + 18);
+      g.lineStyle(1, 0xffffff, 0.2);
+      g.lineBetween(-pX, robeTop + 3, -pX - 10, robeTop + 6);
+      g.lineBetween(-pX - 10, robeTop + 6, -pX, robeTop + 18);
+      g.lineBetween(pX, robeTop + 3, pX + 10, robeTop + 6);
+      g.lineBetween(pX + 10, robeTop + 6, pX, robeTop + 18);
+    }
+
+    // ── SWORD / WEAPON (standard + elite, right side) ───────────
+    if (type !== 'boss') {
+      const sX = bHW * 0.5 + 4;
+      g.lineStyle(2.5, weaponC, 0.9);
+      g.lineBetween(sX, robeTop - 2, sX + 8, botY - 14);
+      // Guard crosspiece
+      g.lineStyle(3, weaponC, 1);
+      g.lineBetween(sX - 5, robeTop + 14, sX + 13, robeTop + 10);
+      // Pommel
+      g.fillStyle(weaponC, 1);
+      g.fillCircle(sX + 8, botY - 13, 3);
+    }
+
+    // ── NECK ────────────────────────────────────────────────────
+    g.fillStyle(skinC, 1);
+    g.fillRect(-3, headCY + headR - 2, 6, 6);
+
+    // ── HAIR VOLUMES (drawn behind face) ────────────────────────
+    g.fillStyle(hairC, 1);
+    g.fillCircle(-headR * 0.75, headCY + headR * 0.1, headR * 0.5);
+    g.fillCircle(headR * 0.75, headCY + headR * 0.1, headR * 0.5);
+
+    // ── FACE ────────────────────────────────────────────────────
+    g.fillStyle(skinC, 1);
+    g.fillCircle(0, headCY, headR);
+
+    // Eyebrows
+    g.lineStyle(1.5, hairC, 1);
+    g.lineBetween(-headR * 0.5, headCY - headR * 0.32, -headR * 0.1, headCY - headR * 0.42);
+    g.lineBetween(headR * 0.1, headCY - headR * 0.42, headR * 0.5, headCY - headR * 0.32);
+
+    // Eyes (colored iris + black pupil)
+    g.fillStyle(eyeC, 1);
+    g.fillCircle(-headR * 0.35, headCY - headR * 0.04, 2.5);
+    g.fillCircle(headR * 0.35, headCY - headR * 0.04, 2.5);
+    g.fillStyle(0x000000, 0.7);
+    g.fillCircle(-headR * 0.35, headCY - headR * 0.04, 1.2);
+    g.fillCircle(headR * 0.35, headCY - headR * 0.04, 1.2);
+
+    // Mouth line
+    g.lineStyle(1, hairC, 0.5);
+    g.lineBetween(-headR * 0.2, headCY + headR * 0.5, headR * 0.2, headCY + headR * 0.5);
+
+    // ── HEADPIECE / TOPKNOT ──────────────────────────────────────
+    if (type === 'boss') {
+      // Imperial crown
+      g.fillStyle(0xddcc33, 1);
+      g.fillRect(-headR - 2, headCY - headR - 2, (headR + 2) * 2, 4);
+      // Three crown spikes
+      [-headR * 0.5, 0, headR * 0.5].forEach((dx, i) => {
+        const sh = i === 1 ? 14 : 9;
+        g.fillTriangle(dx - 4, headCY - headR - 2, dx + 4, headCY - headR - 2, dx, headCY - headR - 2 - sh);
+      });
+      g.fillStyle(0xff2244, 1);
+      g.fillCircle(0, headCY - headR - 14, 4); // Crown gem
+      // Beard
+      g.fillStyle(hairC, 0.8);
+      g.fillTriangle(-headR * 0.35, headCY + headR * 0.5, headR * 0.35, headCY + headR * 0.5, 0, headCY + headR + 5);
+    } else {
+      // Topknot bun + hairpin
+      g.fillStyle(hairC, 1);
+      const stemBot = headCY - headR + 2;
+      const stemTop = topY + 3;
+      g.fillCircle(0, stemTop + 5, 5);
+      g.fillRect(-2, stemTop + 4, 4, stemBot - stemTop - 3);
+      g.lineStyle(1, type === 'elite' ? accentC : 0x998844, 0.85);
+      g.lineBetween(-7, stemTop + 5, 7, stemTop + 2);
+    }
+
+    // Elite: forehead bindi mark
+    if (type === 'elite') {
+      g.fillStyle(accentC, 0.9);
+      g.fillCircle(0, headCY - headR * 0.55, 3);
+    }
+
+    return g;
   }
 
   updateCooldowns() {
@@ -490,7 +602,7 @@ export class CombatScene extends Phaser.Scene {
     this.totalDamage += baseDmg;
     this.playerQi = Math.min(this.playerMaxQi, this.playerQi + 8);
     this.showDamageNumber(baseDmg, isCrit, true);
-    this.flashSprite(this.enemySprite, 0xffffff);
+    this.flashSprite(this.enemySprite, 0xffffff, this.enemyW, this.enemyH);
     // Blood Wolf: hit again, restore HP
     if (isBloodWolfProc && this.enemyHp > 0) {
       this.time.delayedCall(200, () => {
@@ -619,11 +731,10 @@ export class CombatScene extends Phaser.Scene {
     this.enemyFrozen = true;
     this.enemyFreezeTimer = duration;
     if (this.enemyAttackTimer) this.enemyAttackTimer.paused = true;
-    this.enemySprite.setFillStyle(0x88aaff);
+    if (this.enemyFreezeOverlay) this.enemyFreezeOverlay.setVisible(true);
     this.time.delayedCall(duration * 1000, () => {
-      if (this.enemySprite && this.enemySprite.active) {
-        const col = this.enemyData.type === 'boss' ? 0x8b1a1a : this.enemyData.type === 'elite' ? 0x6b2a6b : 0x6b4a2a;
-        this.enemySprite.setFillStyle(col);
+      if (this.enemyFreezeOverlay && this.enemyFreezeOverlay.active) {
+        this.enemyFreezeOverlay.setVisible(false);
       }
     });
   }
@@ -714,15 +825,17 @@ export class CombatScene extends Phaser.Scene {
     });
   }
 
-  flashSprite(sprite, color) {
+  flashSprite(sprite, color, overrideW, overrideH) {
     if (typeof sprite.setFillStyle === 'function') {
       // Rectangle — direct fill-color swap
       const orig = sprite.fillColor;
       sprite.setFillStyle(color);
       this.time.delayedCall(150, () => { if (sprite && sprite.active) sprite.setFillStyle(orig); });
     } else {
-      // Image or other type — overlay a brief coloured rectangle
-      const flash = this.add.rectangle(sprite.x, sprite.y, sprite.displayWidth || 54, sprite.displayHeight || 76, color, 0.65);
+      // Image or Graphics — overlay a brief coloured rectangle
+      const fw = overrideW || sprite.displayWidth || 54;
+      const fh = overrideH || sprite.displayHeight || 76;
+      const flash = this.add.rectangle(sprite.x, sprite.y, fw, fh, color, 0.65);
       this.time.delayedCall(150, () => { if (flash && flash.active) flash.destroy(); });
     }
   }
@@ -1016,11 +1129,13 @@ export class CombatScene extends Phaser.Scene {
       result.techDropId = orthodoxy >= 2 ? 'T19' : 'T17';
     }
     this.time.delayedCall(1500, () => {
+      if (!this.game?.events) return;
       // Emit bossDefeated so PhaserGame.jsx can show karma dialogue
-      if (isBoss && this.game?.events) {
+      if (isBoss) {
         this.game.events.emit('bossDefeated', result);
-      } else if (this.onCombatEnd) {
-        this.onCombatEnd(result);
+      } else {
+        // Non-boss: emit combatVictory (handled in PhaserGame.jsx alongside bossDefeated)
+        this.game.events.emit('combatVictory', result);
       }
     });
   }
@@ -1037,8 +1152,8 @@ export class CombatScene extends Phaser.Scene {
       fontSize: '48px', color: '#8b1a1a', fontFamily: 'serif'
     }).setOrigin(0.5);
     this.time.delayedCall(1500, () => {
-      if (this.onCombatEnd) {
-        this.onCombatEnd({ victory: false, damageDealt: this.totalDamage, remainingHp: 0 });
+      if (this.game?.events) {
+        this.game.events.emit('combatDefeat', { victory: false, damageDealt: this.totalDamage, remainingHp: 0 });
       }
     });
   }
