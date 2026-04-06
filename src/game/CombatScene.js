@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { calculateDamage, calculateCrit, calculateStanceBreak, rollCrit } from '../utils/combat.js';
+import heroImg from '../assets/hero.png';
 
 export class CombatScene extends Phaser.Scene {
   constructor() {
@@ -117,6 +118,8 @@ export class CombatScene extends Phaser.Scene {
     this.interruptWindow = false;
     this.interruptTimer = 0;
     this.pendingUnblockable = false;
+    // Combat readiness — set to true after intro animation completes
+    this.combatReady = false;
     // Twin Blade Widow split tracking
     this.splitOccurred = false;
     // Drunken Drift dodge window tracking
@@ -133,103 +136,175 @@ export class CombatScene extends Phaser.Scene {
     this.initKarma = data.karma || {};
   }
 
-  preload() {}
+  preload() {
+    this.load.image('hero', heroImg);
+  }
 
   create() {
     const W = this.scale.width;
     const H = this.scale.height;
+    this.combatReady = false;
 
-    // Background
+    // ── BACKGROUND ────────────────────────────────────────────────
+    // Main dark base
     this.add.rectangle(W / 2, H / 2, W, H, 0x1a1208);
+    // Sky gradient layers
+    this.add.rectangle(W / 2, H * 0.1, W, H * 0.2, 0x110b05, 1);
+    this.add.rectangle(W / 2, H * 0.88, W, H * 0.24, 0x0d0904, 1);
 
-    // Ink border decoration
+    // Distant mountain silhouettes
+    const mtns = this.add.graphics();
+    mtns.fillStyle(0x0f0c07, 1);
+    mtns.fillTriangle(60, H * 0.58, 190, H * 0.22, 310, H * 0.58);
+    mtns.fillTriangle(230, H * 0.58, 380, H * 0.26, 510, H * 0.58);
+    mtns.fillTriangle(380, H * 0.58, 530, H * 0.30, 640, H * 0.58);
+
+    // Ground / floor
+    const ground = this.add.graphics();
+    ground.fillStyle(0x221508, 1);
+    ground.fillRect(0, H * 0.56, W, H * 0.44);
+    ground.lineStyle(1, 0xc8a96e, 0.35);
+    ground.lineBetween(0, H * 0.56, W, H * 0.56);
+    // Subtle floor-tile lines
+    const tiles = this.add.graphics();
+    tiles.lineStyle(1, 0xc8a96e, 0.08);
+    for (let i = 0; i <= 8; i++) tiles.lineBetween(i * (W / 7), H * 0.56, i * (W / 7) + 60, H);
+
+    // Enemy platform ellipse
+    const plat = this.add.graphics();
+    plat.fillStyle(0x3a2810, 0.55);
+    plat.fillEllipse(W / 2, H * 0.56, W * 0.45, 18);
+    plat.lineStyle(1, 0xc8a96e, 0.3);
+    plat.strokeEllipse(W / 2, H * 0.56, W * 0.45, 18);
+
+    // Ink-brush border + corner ornaments
     const border = this.add.graphics();
     border.lineStyle(2, 0xc8a96e, 0.6);
     border.strokeRect(10, 10, W - 20, H - 20);
+    border.lineStyle(1, 0xc8a96e, 0.35);
+    [[16, 16], [W - 36, 16], [16, H - 36], [W - 36, H - 36]].forEach(([bx, by]) => border.strokeRect(bx, by, 20, 20));
 
-    // Enemy arena background
-    this.add.rectangle(W / 2, H * 0.35, W * 0.7, H * 0.45, 0x2a1e10, 0.8);
-
-    // Phase label
-    this.add.text(W / 2, 20, this.enemyData.name, {
-      fontSize: '18px', color: '#e8c87e', fontFamily: 'serif'
+    // ── ENEMY HEADER ─────────────────────────────────────────────
+    const typeLabel = this.enemyData.type === 'boss' ? '★ BOSS ★' : this.enemyData.type === 'elite' ? '◆ ELITE' : '';
+    if (typeLabel) {
+      this.add.text(W / 2, 18, typeLabel, {
+        fontSize: '10px', color: this.enemyData.type === 'boss' ? '#ff6666' : '#cc88ff', fontFamily: 'serif'
+      }).setOrigin(0.5, 0);
+    }
+    this.add.text(W / 2, typeLabel ? 30 : 20, this.enemyData.name, {
+      fontSize: '17px', color: '#e8c87e', fontFamily: 'serif'
     }).setOrigin(0.5, 0);
 
-    // Enemy sprite (colored rectangle)
-    const enemyColor = this.enemyData.type === 'boss' ? 0x8b1a1a : this.enemyData.type === 'elite' ? 0x6b2a6b : 0x6b4a2a;
-    this.enemySprite = this.add.rectangle(W / 2, H * 0.32, 60, 80, enemyColor);
-    this.enemySprite.setStrokeStyle(2, 0xc8a96e);
-
     // Enemy HP bar
-    this.enemyHpBg = this.add.rectangle(W / 2, H * 0.12, 200, 12, 0x333333);
-    this.enemyHpBar = this.add.rectangle(W / 2 - 100, H * 0.12, 200, 12, 0x8b1a1a).setOrigin(0, 0.5);
-    this.add.text(W / 2, H * 0.08, 'Enemy HP', { fontSize: '11px', color: '#c8a96e' }).setOrigin(0.5);
-    this.enemyHpText = this.add.text(W / 2, H * 0.16, `${this.enemyHp}/${this.enemyMaxHp}`, {
-      fontSize: '11px', color: '#e8c87e'
+    const eHpW = 240;
+    this.enemyHpBg = this.add.rectangle(W / 2, H * 0.13, eHpW, 14, 0x111111);
+    this.enemyHpBg.setStrokeStyle(1, 0xc8a96e, 0.4);
+    this.enemyHpBar = this.add.rectangle(W / 2 - eHpW / 2, H * 0.13, eHpW, 14, 0x8b1a1a).setOrigin(0, 0.5);
+    this.add.text(W / 2 - eHpW / 2 - 5, H * 0.13, '◆', { fontSize: '10px', color: '#8b1a1a' }).setOrigin(1, 0.5);
+    this.enemyHpText = this.add.text(W / 2, H * 0.13, `${this.enemyHp}/${this.enemyMaxHp}`, {
+      fontSize: '10px', color: '#e8c87e'
     }).setOrigin(0.5);
 
-    // Stance health dots (for purple-indicator enemies)
+    // ── STANCE DOTS ───────────────────────────────────────────────
     this.stanceDots = [];
     if (this.enemyStanceHealth > 0) {
       for (let i = 0; i < this.enemyStanceHealth; i++) {
         const dot = this.add.circle(W / 2 - 20 + i * 20, H * 0.19, 5, 0xaa44aa);
+        dot.setStrokeStyle(1, 0xcc88cc, 0.8);
         this.stanceDots.push(dot);
       }
-      this.add.text(W / 2, H * 0.22, 'STANCE', { fontSize: '9px', color: '#aa44aa' }).setOrigin(0.5);
+      this.add.text(W / 2, H * 0.23, 'STANCE', { fontSize: '9px', color: '#aa44aa' }).setOrigin(0.5);
     }
 
-    // Attack indicator (circle glow around enemy)
-    this.attackIndicator = this.add.circle(W / 2, H * 0.32, 50, 0xffff00, 0);
+    // Attack indicator ring
+    this.attackIndicator = this.add.circle(W / 2, H * 0.38, 54, 0xffff00, 0);
     this.attackIndicator.setStrokeStyle(3, 0xffff00, 0);
 
     // Burning Meridian stacks label
     this.stackLabel = null;
     if (this.innerArt?.id === 'burningMeridian') {
-      this.stackLabel = this.add.text(W - 10, H * 0.32, `🔥×${this.burningMeridianStacks}`, {
+      this.stackLabel = this.add.text(W - 10, H * 0.38, `🔥×${this.burningMeridianStacks}`, {
         fontSize: '11px', color: '#ff8800', fontFamily: 'serif'
       }).setOrigin(1, 0.5);
     }
 
-    // Player sprite
-    this.playerSprite = this.add.rectangle(W / 2, H * 0.62, 50, 70, 0x2d4a6e);
-    this.playerSprite.setStrokeStyle(2, 0x6a9ec0);
+    // ── ENEMY SPRITE (rectangle + decoration) ────────────────────
+    const enemyColor = this.enemyData.type === 'boss' ? 0x8b1a1a : this.enemyData.type === 'elite' ? 0x6b2a6b : 0x6b4a2a;
+    const eW = this.enemyData.type === 'boss' ? 78 : this.enemyData.type === 'elite' ? 64 : 54;
+    const eHs = this.enemyData.type === 'boss' ? 100 : this.enemyData.type === 'elite' ? 86 : 72;
+    this.enemySprite = this.add.rectangle(W / 2, H * 0.38, eW, eHs, enemyColor);
+    this.enemySprite.setStrokeStyle(2, 0xc8a96e, 0.7);
+    // Decorative layer drawn on top
+    this.drawEnemyDecoration(W / 2, H * 0.38, this.enemyData.type, eW, eHs);
 
-    // Player HP bar
-    this.playerHpBg = this.add.rectangle(W / 2, H * 0.78, 200, 12, 0x333333);
-    this.playerHpBar = this.add.rectangle(W / 2 - 100, H * 0.78, 200, 12, 0x2d5a27).setOrigin(0, 0.5);
-    this.add.text(W / 2, H * 0.74, 'Your HP', { fontSize: '11px', color: '#c8a96e' }).setOrigin(0.5);
-    this.playerHpText = this.add.text(W / 2, H * 0.82, `${this.playerHp}/${this.playerMaxHp}`, {
-      fontSize: '11px', color: '#e8c87e'
+    // ── PLAYER SPRITE (hero.png) ──────────────────────────────────
+    this.playerSprite = this.add.image(W / 2, H * 0.67, 'hero').setDisplaySize(54, 76);
+
+    // Weapon label under player
+    const wEmoji = { sword: '⚔', spear: '⚡', fists: '👊' }[this.weapon?.id] || '⚔';
+    this.add.text(W / 2, H * 0.75, `${wEmoji} ${this.weapon?.name || 'Fighter'}`, {
+      fontSize: '11px', color: '#c8a96e88', fontFamily: 'serif'
+    }).setOrigin(0.5);
+
+    // ── PLAYER HP BAR ─────────────────────────────────────────────
+    const pHpW = 220;
+    this.playerHpBg = this.add.rectangle(W / 2, H * 0.81, pHpW, 14, 0x111111);
+    this.playerHpBg.setStrokeStyle(1, 0x4a7a44, 0.4);
+    this.playerHpBar = this.add.rectangle(W / 2 - pHpW / 2, H * 0.81, pHpW, 14, 0x2d5a27).setOrigin(0, 0.5);
+    this.add.text(W / 2 - pHpW / 2 - 5, H * 0.81, '♥', { fontSize: '12px', color: '#6abf6a' }).setOrigin(1, 0.5);
+    this.playerHpText = this.add.text(W / 2, H * 0.81, `${this.playerHp}/${this.playerMaxHp}`, {
+      fontSize: '10px', color: '#e8c87e'
     }).setOrigin(0.5);
 
     // Qi bar
-    this.qiBg = this.add.rectangle(W / 2, H * 0.86, 200, 8, 0x333333);
-    this.qiBar = this.add.rectangle(W / 2 - 100, H * 0.86, 0, 8, 0x4a6e9e).setOrigin(0, 0.5);
-    this.add.text(W / 2 - 105, H * 0.86, 'QI', { fontSize: '10px', color: '#c8a96e' }).setOrigin(1, 0.5);
+    this.qiBg = this.add.rectangle(W / 2, H * 0.86, pHpW, 8, 0x111111);
+    this.qiBg.setStrokeStyle(1, 0x4a6e9e, 0.3);
+    this.qiBar = this.add.rectangle(W / 2 - pHpW / 2, H * 0.86, 0, 8, 0x4a6e9e).setOrigin(0, 0.5);
+    this.add.text(W / 2 - pHpW / 2 - 5, H * 0.86, '氣', { fontSize: '10px', color: '#6a9ec0' }).setOrigin(1, 0.5);
 
-    // Auto-attack timer
+    // ── TIMERS (start paused — unlocked after intro) ──────────────
     this.autoAttackTimer = this.time.addEvent({
-      delay: 1500,
-      callback: this.doAutoAttack,
-      callbackScope: this,
-      loop: true
+      delay: 1500, callback: this.doAutoAttack, callbackScope: this, loop: true, paused: true
     });
-
-    // Enemy attack timer
     this.enemyAttackTimer = this.time.addEvent({
-      delay: 2500,
-      callback: this.doEnemyAttack,
-      callbackScope: this,
-      loop: true,
-      startAt: 1000
+      delay: 2500, callback: this.doEnemyAttack, callbackScope: this, loop: true, paused: true
+    });
+    this.time.addEvent({
+      delay: 100, callback: this.updateCooldowns, callbackScope: this, loop: true
     });
 
-    // Skill cooldown timers
-    this.time.addEvent({
-      delay: 100,
-      callback: this.updateCooldowns,
-      callbackScope: this,
-      loop: true
+    // ── INTRO ANIMATION ───────────────────────────────────────────
+    // Entrance flash
+    const introFlash = this.add.rectangle(W / 2, H / 2, W, H, 0xffffff, 0.6);
+    this.tweens.add({ targets: introFlash, alpha: 0, duration: 350, onComplete: () => introFlash.destroy() });
+
+    // Enemy slides in from above
+    this.enemySprite.setY(-150);
+    this.tweens.add({ targets: this.enemySprite, y: H * 0.38, duration: 650, ease: 'Back.easeOut' });
+
+    // Player slides in from below
+    this.playerSprite.setY(H + 80);
+    this.tweens.add({ targets: this.playerSprite, y: H * 0.67, duration: 650, delay: 180, ease: 'Back.easeOut' });
+
+    // "BATTLE START" banner after sprites land
+    this.time.delayedCall(900, () => {
+      const bannerBg = this.add.rectangle(W / 2, H / 2, W, 58, 0x0d0800, 0.95);
+      bannerBg.setStrokeStyle(2, 0xc8a96e, 0.7);
+      const bannerTxt = this.add.text(W / 2, H / 2, '— 戰鬥開始 · BATTLE START —', {
+        fontSize: '15px', color: '#e8c87e', fontFamily: 'serif', letterSpacing: 3
+      }).setOrigin(0.5).setAlpha(0);
+      this.tweens.add({ targets: [bannerBg, bannerTxt], alpha: { from: 0, to: 1 }, duration: 220 });
+      this.tweens.add({
+        targets: [bannerBg, bannerTxt], alpha: 0, duration: 280, delay: 850,
+        onComplete: () => { bannerBg.destroy(); bannerTxt.destroy(); }
+      });
+    });
+
+    // Unlock combat after intro
+    this.time.delayedCall(2100, () => {
+      this.combatReady = true;
+      this.autoAttackTimer.paused = false;
+      this.enemyAttackTimer.paused = false;
     });
 
     this.updateBars();
@@ -245,6 +320,48 @@ export class CombatScene extends Phaser.Scene {
         movementArt: this.movementArt,
         activeSynergies: this.activeSynergies
       });
+    }
+  }
+
+  // Draw decorative Graphics layer over the enemy rectangle to suggest a character silhouette
+  drawEnemyDecoration(x, y, type, w, h) {
+    const g = this.add.graphics();
+    const topY = y - h / 2;
+    if (type === 'boss') {
+      // Crown spikes
+      g.fillStyle(0xf0d060, 1);
+      g.fillTriangle(x - 16, topY, x, topY - 20, x + 16, topY);
+      g.fillTriangle(x - 8, topY, x - 8, topY - 12, x + 8, topY - 12);
+      // Glowing eyes
+      g.fillStyle(0xff3333, 1);
+      g.fillCircle(x - 9, topY + 14, 5);
+      g.fillCircle(x + 9, topY + 14, 5);
+      g.fillStyle(0xff9999, 0.8);
+      g.fillCircle(x - 9, topY + 13, 2);
+      g.fillCircle(x + 9, topY + 13, 2);
+      // Shoulder pauldrons
+      g.fillStyle(0x6a1010, 0.9);
+      g.fillRect(x - w / 2 - 8, topY + 25, 10, 18);
+      g.fillRect(x + w / 2 - 2, topY + 25, 10, 18);
+    } else if (type === 'elite') {
+      // Diamond crest
+      g.fillStyle(0xcc88ff, 0.9);
+      g.fillTriangle(x, topY - 14, x + 9, topY - 4, x, topY + 6);
+      g.fillTriangle(x, topY - 14, x - 9, topY - 4, x, topY + 6);
+      // Eyes
+      g.fillStyle(0xdd66ff, 1);
+      g.fillCircle(x - 7, topY + 12, 4);
+      g.fillCircle(x + 7, topY + 12, 4);
+      g.fillStyle(0xffffff, 0.7);
+      g.fillCircle(x - 7, topY + 11, 1.5);
+      g.fillCircle(x + 7, topY + 11, 1.5);
+    } else {
+      // Standard bandit — simple eyes and a bandana line
+      g.fillStyle(0xffd8a0, 0.7);
+      g.fillCircle(x - 6, topY + 10, 3.5);
+      g.fillCircle(x + 6, topY + 10, 3.5);
+      g.lineStyle(2, 0xaa7733, 0.6);
+      g.lineBetween(x - w / 2 + 2, topY + 5, x + w / 2 - 2, topY + 5);
     }
   }
 
@@ -343,7 +460,8 @@ export class CombatScene extends Phaser.Scene {
   }
 
   doAutoAttack() {
-    if (this.enemyHp <= 0) return;
+    // Guard: combatReady is false during the intro animation (first ~2.1s)
+    if (!this.combatReady || this.enemyHp <= 0) return;
     this.hitCount++;
     const isCrit = rollCrit(this.critChance);
     let mult = this.getTechniqueMultiplier();
@@ -415,7 +533,8 @@ export class CombatScene extends Phaser.Scene {
   }
 
   doEnemyAttack() {
-    if (this.enemyHp <= 0 || this.playerHp <= 0) return;
+    // Guard: combatReady is false during the intro animation (first ~2.1s)
+    if (!this.combatReady || this.enemyHp <= 0 || this.playerHp <= 0) return;
     if (this.enemyFrozen) return;
     // Iron Monk Disciple phase 1: can't damage unless stance-broken
     if (this.enemyData.id === 'E08' && this.enemyPhase === 1 && this.enemyStanceBlockActive) {
@@ -596,9 +715,16 @@ export class CombatScene extends Phaser.Scene {
   }
 
   flashSprite(sprite, color) {
-    const orig = sprite.fillColor;
-    sprite.setFillStyle(color);
-    this.time.delayedCall(150, () => { if (sprite && sprite.active) sprite.setFillStyle(orig); });
+    if (typeof sprite.setFillStyle === 'function') {
+      // Rectangle — direct fill-color swap
+      const orig = sprite.fillColor;
+      sprite.setFillStyle(color);
+      this.time.delayedCall(150, () => { if (sprite && sprite.active) sprite.setFillStyle(orig); });
+    } else {
+      // Image or other type — overlay a brief coloured rectangle
+      const flash = this.add.rectangle(sprite.x, sprite.y, sprite.displayWidth || 54, sprite.displayHeight || 76, color, 0.65);
+      this.time.delayedCall(150, () => { if (flash && flash.active) flash.destroy(); });
+    }
   }
 
   useSkill1() {
@@ -788,35 +914,38 @@ export class CombatScene extends Phaser.Scene {
 
   showSkillEffect() {
     const W = this.scale.width;
-    const flash = this.add.rectangle(W / 2, this.scale.height * 0.32, 80, 100, 0xffdd00, 0.6);
-    this.tweens.add({
-      targets: flash,
-      alpha: 0,
-      scaleX: 2,
-      duration: 400,
-      onComplete: () => flash.destroy()
-    });
+    const H = this.scale.height;
+    const weaponColors = { sword: 0xffd700, spear: 0x44aaff, fists: 0xff6600 };
+    const col = weaponColors[this.weapon?.id] || 0xffdd00;
+    // Expanding flash
+    const flash = this.add.rectangle(W / 2, H * 0.38, 90, 110, col, 0.65);
+    this.tweens.add({ targets: flash, alpha: 0, scaleX: 2.5, duration: 380, onComplete: () => flash.destroy() });
+    // Slash line
+    const slash = this.add.graphics();
+    slash.lineStyle(3, col, 0.9);
+    slash.lineBetween(W / 2 - 38, H * 0.29, W / 2 + 38, H * 0.47);
+    slash.lineStyle(1, 0xffffff, 0.5);
+    slash.lineBetween(W / 2 - 33, H * 0.28, W / 2 + 33, H * 0.46);
+    this.tweens.add({ targets: slash, alpha: 0, duration: 340, onComplete: () => slash.destroy() });
   }
 
   showUltimateEffect() {
     const W = this.scale.width;
     const H = this.scale.height;
-    const flash = this.add.rectangle(W / 2, H * 0.32, 120, 140, 0xff6600, 0.8);
-    this.tweens.add({
-      targets: flash,
-      alpha: 0,
-      scaleX: 3,
-      scaleY: 2,
-      duration: 600,
-      onComplete: () => flash.destroy()
-    });
-    const overlay = this.add.rectangle(W / 2, H / 2, W, H, 0xff6600, 0.3);
-    this.tweens.add({
-      targets: overlay,
-      alpha: 0,
-      duration: 500,
-      onComplete: () => overlay.destroy()
-    });
+    // Large burst
+    const flash = this.add.rectangle(W / 2, H * 0.38, 130, 150, 0xff6600, 0.85);
+    this.tweens.add({ targets: flash, alpha: 0, scaleX: 3, scaleY: 2, duration: 580, onComplete: () => flash.destroy() });
+    // Screen tint
+    const overlay = this.add.rectangle(W / 2, H / 2, W, H, 0xff6600, 0.30);
+    this.tweens.add({ targets: overlay, alpha: 0, duration: 480, onComplete: () => overlay.destroy() });
+    // Ripple rings
+    for (let i = 0; i < 3; i++) {
+      this.time.delayedCall(i * 110, () => {
+        const ring = this.add.circle(W / 2, H * 0.38, 22 + i * 14, 0xff6600, 0);
+        ring.setStrokeStyle(3, 0xff8800, 0.9);
+        this.tweens.add({ targets: ring, scaleX: 3.2, scaleY: 3.2, alpha: 0, duration: 520, onComplete: () => ring.destroy() });
+      });
+    }
   }
 
   updateBars() {
