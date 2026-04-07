@@ -1,6 +1,32 @@
 import { useGame } from '../store/gameStore.jsx';
 import { detectSynergies } from '../utils/synergies.js';
 
+const KARMA_DESCRIPTIONS = {
+  mercy:     { label: '仁 Mercy',     color: '#6acc6a', desc: 'Affects boss spare dialogues, healer costs, and Fate Imprint "Compassionate" (≥+3) or "Blood-Handed" (≤-2). High mercy unlocks special event choices.' },
+  honor:     { label: '義 Honor',     color: '#cc9944', desc: 'Unlocks Sect Trial access (≥0 required), affects duel outcomes. High honor grants Fate Imprint "Righteous" (≥+3). Low honor closes orthodox paths.' },
+  ambition:  { label: '志 Ambition',  color: '#cc4444', desc: 'Earned by challenging masters and forcing paths. High ambition grants Fate Imprint "Driven" (≥+3). Affects rare technique access.' },
+  orthodoxy: { label: '道 Orthodoxy', color: '#4a88cc', desc: 'Required for Sect Trial (≥0) and Wandering Master teaching. Low orthodoxy (≤-2) unlocks forbidden techniques and "Forbidden" Fate Imprint.' },
+  renown:    { label: '名 Renown',    color: '#cc88cc', desc: 'Built through duels and public deeds. High renown grants Fate Imprint "Legend" (≥+2) or "Feared" (≤-2). Affects Silver bonuses.' }
+};
+
+const SEAL_DESCRIPTIONS = {
+  spared_iron_fan_widow: {
+    label: '印記 · The Widow Spared',
+    icon: '🕊',
+    effect: 'Next run: unlocks "A Familiar Face" event — the Iron Fan Widow teaches you Phantom Blade Step.'
+  },
+  entered_forbidden_cave: {
+    label: '印記 · The Madman\'s Cave',
+    icon: '🕳',
+    effect: 'Next run: the forbidden cave can be entered again; its technique will be from a deeper chapter.'
+  },
+  joined_black_cliff: {
+    label: '印記 · Black Cliff Manor',
+    icon: '🏯',
+    effect: 'Next run: Black Cliff events appear; their relic rewards are enhanced.'
+  }
+};
+
 const S = {
   container: {
     width: '100%',
@@ -50,14 +76,28 @@ const S = {
     padding: '2px 6px',
     background: val > 0 ? '#1a2a1a' : val < 0 ? '#2a1a1a' : '#1a1508',
     border: `1px solid ${val > 0 ? '#4a8b4a33' : val < 0 ? '#8b4a4a33' : '#c8a96e22'}`,
-    borderRadius: '2px'
-  })
+    borderRadius: '2px',
+    cursor: 'help'
+  }),
+  sealBox: {
+    marginTop: '8px',
+    padding: '8px 10px',
+    background: '#1a1a2e',
+    border: '1px solid #4a4a8b44',
+    borderRadius: '2px',
+    fontSize: '11px',
+    color: '#9999cc'
+  },
+  sealLabel: { fontSize: '12px', color: '#b0b0ee', display: 'block', marginBottom: '3px' },
+  sealEffect: { fontSize: '10px', color: '#8888aa', lineHeight: '1.4' }
 };
 
 export default function BuildSummary() {
   const { state } = useGame();
-  const { runState } = state;
+  const { runState, metaState } = state;
   const synergies = detectSynergies(runState.techniques);
+  const currentSeal = metaState?.memorySeal || null;
+  const sealInfo = currentSeal ? SEAL_DESCRIPTIONS[currentSeal] : null;
 
   return (
     <div style={S.container}>
@@ -78,12 +118,32 @@ export default function BuildSummary() {
           ))}
         </div>
         <div style={{ marginTop: '8px' }}>
-          <div style={S.sectionTitle}>Karma</div>
+          <div style={S.sectionTitle}>Karma <span style={{ fontSize: '9px', color: '#c8a96e44', fontStyle: 'italic' }}>(hover for effects)</span></div>
           <div style={S.karmaRow}>
-            {Object.entries(runState.karma).map(([k, v]) => (
-              <span key={k} style={S.karmaItem(v)}>{k}: {v > 0 ? '+' : ''}{v}</span>
-            ))}
+            {Object.entries(runState.karma).map(([k, v]) => {
+              const info = KARMA_DESCRIPTIONS[k];
+              return (
+                <span
+                  key={k}
+                  style={{ ...S.karmaItem(v), borderColor: info ? info.color + '44' : undefined }}
+                  title={info ? `${info.label}\n${info.desc}` : k}
+                >
+                  {info ? info.label.split(' ')[0] : k}: {v > 0 ? '+' : ''}{v}
+                </span>
+              );
+            })}
           </div>
+          {sealInfo && (
+            <div style={S.sealBox}>
+              <span style={S.sealLabel}>{sealInfo.icon} {sealInfo.label}</span>
+              <span style={S.sealEffect}>{sealInfo.effect}</span>
+            </div>
+          )}
+          {!sealInfo && (
+            <div style={{ marginTop: '6px', fontSize: '10px', color: '#c8a96e33', fontStyle: 'italic' }}>
+              Memory Seal: none yet — major choices this run can leave a mark for the next life.
+            </div>
+          )}
         </div>
       </div>
 

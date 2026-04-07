@@ -1,4 +1,13 @@
+import { useState } from 'react';
 import { useGame } from '../store/gameStore.jsx';
+
+const KARMA_LEGEND = [
+  { key: 'mercy',     label: '仁 Mercy',     color: '#6acc6a', desc: 'Affects boss spare dialogues & "Compassionate" Fate Imprint (≥+3). Required for some healing events.' },
+  { key: 'honor',     label: '義 Honor',     color: '#cc9944', desc: 'Required for Sect Trial (≥0). High honor → "Righteous" Fate Imprint. Low honor closes orthodox paths.' },
+  { key: 'ambition',  label: '志 Ambition',  color: '#cc4444', desc: 'Earned by challenging masters. High ambition → "Driven" Fate Imprint. Unlocks power at a cost.' },
+  { key: 'orthodoxy', label: '道 Orthodoxy', color: '#4a88cc', desc: 'Required for Wandering Master teaching & Sect Trial (≥0). Low orthodoxy (≤-2) → forbidden techniques & "Forbidden" Imprint.' },
+  { key: 'renown',    label: '名 Renown',    color: '#cc88cc', desc: 'Built by public deeds & duels. High renown → "Legend" Fate Imprint; very low → "Feared".' }
+];
 
 const S = {
   container: {
@@ -50,13 +59,14 @@ function formatOutcome(outcome) {
   if (outcome.silver) parts.push(`${outcome.silver > 0 ? '+' : ''}${outcome.silver} silver`);
   if (outcome.essence) parts.push(`+${outcome.essence} essence`);
   if (outcome.hpMax) parts.push(`+${outcome.hpMax} max HP`);
-  if (outcome.technique) parts.push('+ Technique');
-  if (outcome.relic) parts.push('+ Relic');
-  if (outcome.memorySeal) parts.push('Memory Seal');
-  if (outcome.techniqueShard) parts.push('+ Technique Shard');
+  if (outcome.technique) parts.push('+ Technique (requires open slot)');
+  if (outcome.relic) parts.push('+ Relic (requires open slot)');
+  if (outcome.memorySeal) parts.push('📌 Memory Seal (carries to next life)');
+  if (outcome.techniqueShard) parts.push('+ Technique Shard (½ bonus next run)');
   if (outcome.shop) parts.push('🛒 Open Shop');
   if (outcome.karma) {
-    Object.entries(outcome.karma).forEach(([k, v]) => parts.push(`${k} ${v > 0 ? '+' : ''}${v}`));
+    const KARMA_SHORT = { mercy:'仁 Mercy', honor:'義 Honor', ambition:'志 Ambition', orthodoxy:'道 Orthodoxy', renown:'名 Renown' };
+    Object.entries(outcome.karma).forEach(([k, v]) => parts.push(`${KARMA_SHORT[k] || k} ${v > 0 ? '+' : ''}${v}`));
   }
   return parts.join(' · ');
 }
@@ -72,6 +82,7 @@ export default function EventScreen() {
   const { state, actions } = useGame();
   const event = state.pendingEvent;
   const runState = state.runState;
+  const [showKarmaLegend, setShowKarmaLegend] = useState(false);
 
   if (!event) {
     return (
@@ -127,9 +138,34 @@ export default function EventScreen() {
                 <span>{choice.text}{karmaHint && <span style={{ fontSize: '10px', color: '#bf6a6a', marginLeft: '6px' }}>⚠ requires {karmaHint}</span>}</span>
                 <span style={S.outcomePreview}>{formatOutcome(choice.outcome)}</span>
               </button>
+
             );
           })}
         </div>
+
+        {/* Karma legend toggle */}
+        <div style={{ marginTop: '20px', borderTop: '1px solid #c8a96e11', paddingTop: '10px' }}>
+          <button
+            style={{ background: 'none', border: 'none', color: '#c8a96e44', fontSize: '11px', cursor: 'pointer', fontFamily: 'serif', padding: '0' }}
+            onClick={() => setShowKarmaLegend(s => !s)}
+          >
+            {showKarmaLegend ? '▲' : '▼'} What does karma do?
+          </button>
+          {showKarmaLegend && (
+            <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {KARMA_LEGEND.map(k => (
+                <div key={k.key} style={{ fontSize: '11px', color: '#c8a96e88', lineHeight: '1.5', borderLeft: `2px solid ${k.color}55`, paddingLeft: '8px' }}>
+                  <span style={{ color: k.color, fontWeight: 'bold' }}>{k.label}</span>
+                  <span style={{ display: 'block', fontSize: '10px', color: '#c8a96e55' }}>{k.desc}</span>
+                </div>
+              ))}
+              <div style={{ fontSize: '10px', color: '#c8a96e44', fontStyle: 'italic', marginTop: '4px' }}>
+                Memory Seal: choosing certain paths leaves a permanent mark. The seal carries to your next life and unlocks a unique event.
+              </div>
+            </div>
+          )}
+        </div>
+
       </div>
     </div>
   );

@@ -1,6 +1,5 @@
 import Phaser from 'phaser';
 import { calculateDamage, calculateCrit, calculateStanceBreak, rollCrit } from '../utils/combat.js';
-import heroImg from '../assets/hero.png';
 
 export class CombatScene extends Phaser.Scene {
   constructor() {
@@ -136,9 +135,7 @@ export class CombatScene extends Phaser.Scene {
     this.initKarma = data.karma || {};
   }
 
-  preload() {
-    this.load.image('hero', heroImg);
-  }
+  preload() {}
 
   create() {
     const W = this.scale.width;
@@ -239,8 +236,10 @@ export class CombatScene extends Phaser.Scene {
     this.enemyFreezeOverlay = this.add.rectangle(W / 2, H * 0.38, eW + 12, eHs + 8, 0x88aaff, 0.45);
     this.enemyFreezeOverlay.setVisible(false);
 
-    // ── PLAYER SPRITE (hero.png) ──────────────────────────────────
-    this.playerSprite = this.add.image(W / 2, H * 0.67, 'hero').setDisplaySize(54, 76);
+    // ── PLAYER CHARACTER (human-like Graphics silhouette) ─────────
+    this.playerW = 54;
+    this.playerH = 76;
+    this.playerSprite = this.drawPlayerCharacter(W / 2, H * 0.67, this.weapon?.id || 'sword');
 
     // Weapon label under player
     const wEmoji = { sword: '⚔', spear: '⚡', fists: '👊' }[this.weapon?.id] || '⚔';
@@ -473,6 +472,140 @@ export class CombatScene extends Phaser.Scene {
       g.fillStyle(accentC, 0.9);
       g.fillCircle(0, headCY - headR * 0.55, 3);
     }
+
+    return g;
+  }
+
+  // Draw a human-like wuxia hero (player) using local-coordinate Phaser Graphics.
+  // Styled distinctly from enemies: lighter robe, silver/white trim, hero silhouette.
+  drawPlayerCharacter(cx, cy, weaponId) {
+    const g = this.add.graphics();
+    g.setPosition(cx, cy);
+
+    const h = 76;
+    const w = 54;
+    const topY = -h / 2;
+    const botY = h / 2;
+    const headR = 9;
+    const headCY = topY + headR * 2 + 2;
+    const robeTop = headCY + headR + 3;
+    const tHW = w * 0.22;
+    const bHW = w * 0.4;
+
+    // Hero palette — light blue-white robe, silver trim, warm skin
+    const robeC   = 0x1c3a5e;    // deep ink-blue robe
+    const trimC   = 0xd0d8e8;    // silver-white trim
+    const accentC = 0xd4b860;    // gold accent on belt
+    const skinC   = 0xc8905a;    // warm skin
+    const hairC   = 0x1a0e00;    // near-black hair
+    const eyeC    = 0x1a3a6e;    // deep blue eyes (hero gaze)
+    const sashC   = 0x4a88cc;    // bright blue sash under belt
+
+    // Ground shadow
+    g.fillStyle(0x000000, 0.18);
+    g.fillEllipse(0, botY + 2, w * 0.65, 6);
+
+    // ── WEAPON / SHEATHED ON LEFT HIP ────────────────────────────
+    if (weaponId === 'fists') {
+      // Wrapped hands visible at sides — just accent cuffs
+      g.fillStyle(trimC, 0.7);
+      g.fillRect(-bHW * 0.55 - 3, robeTop + 30, 7, 14);
+      g.fillRect(bHW * 0.55 - 4, robeTop + 30, 7, 14);
+    } else if (weaponId === 'spear') {
+      // Long spear held upright at right side
+      g.lineStyle(2.5, 0xbbaa88, 0.95);
+      g.lineBetween(bHW * 0.55, topY - 20, bHW * 0.55 + 3, botY + 2);
+      g.fillStyle(0xccbb44, 1);
+      g.fillTriangle(bHW * 0.55 - 4, topY - 20, bHW * 0.55 + 4, topY - 20, bHW * 0.55 + 1, topY - 36);
+    } else {
+      // Sword sheathed on left hip (blade visible at angle)
+      const sX = -bHW * 0.48 - 2;
+      g.lineStyle(2, 0xbbaa88, 0.9);
+      g.lineBetween(sX, robeTop + 15, sX - 6, botY - 4);
+      g.fillStyle(accentC, 1);
+      g.fillRect(sX - 5, robeTop + 13, 9, 4); // guard
+      g.fillStyle(0xbbaa88, 1);
+      g.fillCircle(sX - 2, botY - 3, 3); // pommel
+    }
+
+    // ── ROBE ─────────────────────────────────────────────────────
+    g.fillStyle(robeC, 1);
+    g.fillTriangle(-tHW, robeTop, tHW, robeTop, -bHW, botY);
+    g.fillTriangle(tHW, robeTop, -bHW, botY, bHW, botY);
+
+    // Silver collar overlap
+    g.fillStyle(trimC, 0.18);
+    g.fillTriangle(-tHW * 0.6, robeTop - 1, tHW * 0.6, robeTop - 1, 0, robeTop + Math.round(h * 0.2));
+
+    // Silver trim lines on robe edge
+    g.lineStyle(1, trimC, 0.5);
+    g.lineBetween(-tHW, robeTop, -bHW, botY);
+    g.lineBetween(tHW, robeTop, bHW, botY);
+    g.lineBetween(-bHW + 2, botY, bHW - 2, botY);
+
+    // Center seam with blue sash
+    const beltY = robeTop + (botY - robeTop) * 0.36;
+    const beltHW = tHW + (bHW - tHW) * 0.36;
+    g.lineStyle(4, sashC, 0.5);
+    g.lineBetween(0, robeTop + 5, 0, beltY - 2);
+
+    // Belt
+    g.lineStyle(2.5, accentC, 0.9);
+    g.lineBetween(-beltHW + 2, beltY, beltHW - 2, beltY);
+    g.fillStyle(accentC, 0.9);
+    g.fillRect(-3, beltY - 2, 6, 4); // buckle
+
+    // ── NECK ─────────────────────────────────────────────────────
+    g.fillStyle(skinC, 1);
+    g.fillRect(-3, headCY + headR - 2, 6, 6);
+
+    // Collar silver edge
+    g.lineStyle(1, trimC, 0.6);
+    g.lineBetween(-tHW * 0.55, robeTop + 2, 0, robeTop + 10);
+    g.lineBetween(tHW * 0.55, robeTop + 2, 0, robeTop + 10);
+
+    // ── HAIR ─────────────────────────────────────────────────────
+    g.fillStyle(hairC, 1);
+    g.fillCircle(-headR * 0.7, headCY + headR * 0.15, headR * 0.45);
+    g.fillCircle(headR * 0.7, headCY + headR * 0.15, headR * 0.45);
+
+    // ── FACE ─────────────────────────────────────────────────────
+    g.fillStyle(skinC, 1);
+    g.fillCircle(0, headCY, headR);
+
+    // Determined brow line
+    g.lineStyle(1.5, hairC, 0.9);
+    g.lineBetween(-headR * 0.52, headCY - headR * 0.38, -headR * 0.12, headCY - headR * 0.5);
+    g.lineBetween(headR * 0.12, headCY - headR * 0.5, headR * 0.52, headCY - headR * 0.38);
+
+    // Eyes
+    g.fillStyle(eyeC, 1);
+    g.fillCircle(-headR * 0.35, headCY - headR * 0.05, 2.5);
+    g.fillCircle(headR * 0.35, headCY - headR * 0.05, 2.5);
+    g.fillStyle(0x000000, 0.7);
+    g.fillCircle(-headR * 0.35, headCY - headR * 0.05, 1.2);
+    g.fillCircle(headR * 0.35, headCY - headR * 0.05, 1.2);
+    // Eye glint
+    g.fillStyle(0xffffff, 0.6);
+    g.fillCircle(-headR * 0.28, headCY - headR * 0.12, 0.9);
+    g.fillCircle(headR * 0.42, headCY - headR * 0.12, 0.9);
+
+    // Determined mouth (slight set jaw)
+    g.lineStyle(1, hairC, 0.55);
+    g.lineBetween(-headR * 0.22, headCY + headR * 0.52, headR * 0.22, headCY + headR * 0.52);
+
+    // ── HERO TOPKNOT ─────────────────────────────────────────────
+    g.fillStyle(hairC, 1);
+    const stemBot = headCY - headR + 2;
+    const stemTop = topY + 4;
+    g.fillRect(-2, stemTop + 3, 4, stemBot - stemTop - 2);
+    g.fillCircle(0, stemTop + 5, 6);
+    // Silver hairpin
+    g.lineStyle(1.5, trimC, 0.9);
+    g.lineBetween(-8, stemTop + 4, 8, stemTop + 7);
+    // Small jade bead on pin
+    g.fillStyle(0x44aa66, 1);
+    g.fillCircle(6, stemTop + 6, 2);
 
     return g;
   }
@@ -713,7 +846,7 @@ export class CombatScene extends Phaser.Scene {
     } else {
       this.showDamageNumber(dmg, false, false);
     }
-    this.flashSprite(this.playerSprite, 0xff4444);
+    this.flashSprite(this.playerSprite, 0xff4444, this.playerW, this.playerH);
     // Burning Meridian: taking damage loses 1 stack
     if (this.innerArt?.id === 'burningMeridian' && this.burningMeridianStacks > 0) {
       this.burningMeridianStacks--;

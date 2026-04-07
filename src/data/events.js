@@ -2,9 +2,9 @@ export const EVENTS = [
   {
     id: 'E_PHYSICIAN',
     name: 'The Fallen Physician',
-    description: 'A physician lies beaten on the road. Her medicine chest has been ransacked. She asks you to escort her to the next town. A pursuer will intercept you.',
+    description: 'A physician lies beaten on the road. Her medicine chest has been ransacked. She asks you to escort her to the next town.',
     choices: [
-      { text: 'Escort her (+1 fight)', outcome: { healHp: 30, karma: { mercy: 1 }, note: 'Opens Wandering Master event variant' } },
+      { text: 'Escort her safely to the next town', outcome: { healHp: 30, karma: { mercy: 1 } } },
       { text: 'Give her your silver (−30 silver)', outcome: { silver: -30, hpMax: 5, karma: { mercy: 1 } } },
       { text: 'Leave her', outcome: { silver: 10, karma: { mercy: -1 } } }
     ]
@@ -54,9 +54,9 @@ export const EVENTS = [
     name: 'The Old Rival',
     description: 'A martial artist from your past blocks the road. "This path belongs to the Flying Hawk Sect," he warns.',
     choices: [
-      { text: 'Fight through (+1 combat)', outcome: { karma: { ambition: 1 }, silver: 25 } },
-      { text: 'Find another way (lose 1 node progress)', outcome: { karma: { mercy: 1 } } },
-      { text: 'Challenge them to a duel (formal)', outcome: { karma: { honor: 1, renown: 1 }, technique: 'T05' } }
+      { text: 'Push past them with force — no words needed', outcome: { karma: { ambition: 1 }, silver: 25 } },
+      { text: 'Find another way around (add Mercy)', outcome: { karma: { mercy: 1 } } },
+      { text: 'Challenge them to a formal duel', outcome: { karma: { honor: 1, renown: 1 }, technique: 'T05' } }
     ]
   },
   {
@@ -76,7 +76,7 @@ export const EVENTS = [
     choices: [
       { text: 'Ask to be taught (Orthodox path)', outcome: { technique: 'T19', karma: { orthodoxy: 1 } } },
       { text: 'Observe from afar and learn what you can', outcome: { techniqueShard: true } },
-      { text: 'Challenge them to prove your worth', outcome: { karma: { ambition: 1, honor: 1 }, note: '+1 combat, rare technique on win' } }
+      { text: 'Prove your worth in a spar — and earn their rare teaching', outcome: { technique: 'T17', karma: { ambition: 1, honor: 1 } } }
     ]
   },
   {

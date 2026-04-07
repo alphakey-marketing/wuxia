@@ -121,7 +121,13 @@ export default function WanderingMasterScreen() {
   };
 
   const handleChallenge = () => {
-    // Challenge: +ambition + honor, leads to combat
+    // Challenge: earn Nine Dragon Destruction (rare technique) + karma
+    const RARE_CHALLENGE_TECH = TECHNIQUES['T17'];
+    const alreadyOwns = runState.techniques.find(t => t.id === 'T17');
+    const hasFreeSlot = runState.techniques.length < (runState.maxTechniques || 6);
+    if (RARE_CHALLENGE_TECH && !alreadyOwns && hasFreeSlot) {
+      actions.chooseReward({ type: 'newTechnique', data: RARE_CHALLENGE_TECH });
+    }
     actions.completeEvent({ outcome: { karma: { ambition: 1, honor: 1 } } });
   };
 
@@ -185,8 +191,8 @@ export default function WanderingMasterScreen() {
           <span style={{ display: 'block', fontSize: '11px', color: '#c8a96e55', marginTop: '3px' }}>Gain a small insight (+1 Renown)</span>
         </button>
         <button style={S.optionBtn('secondary')} onClick={handleChallenge}>
-          ⚔ Challenge them to prove your worth
-          <span style={{ display: 'block', fontSize: '11px', color: '#c8a96e55', marginTop: '3px' }}>+1 Ambition, +1 Honor — a fight awaits, with a rare technique as reward on victory</span>
+          ⚔ Prove your worth in a spar — earn their rare technique
+          <span style={{ display: 'block', fontSize: '11px', color: '#c8a96e55', marginTop: '3px' }}>+1 Ambition, +1 Honor · Grants Nine Dragon Destruction (if slot available)</span>
         </button>
         <button style={{ ...S.optionBtn('secondary'), opacity: 0.5 }} onClick={handleLeave}>
           Walk past without engaging
