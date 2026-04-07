@@ -13,6 +13,24 @@ const IMPRINT_FLAVOUR = {
   feared: '"Even the wind stepped aside on this road. Your shadow was enough to empty a village square."'
 };
 
+const IMPRINT_BONUSES = {
+  compassionate: '+10 max HP next life',
+  blood_handed: '+5 Attack · starts with Blood Handed flag (reduced healing on map)',
+  righteous: 'Starts with Empty Hand Bell relic (Counter)',
+  schemer: '+20 starting silver',
+  driven: 'Bosses gain +10% HP & ATK — harder, but worthier',
+  grandmaster: 'Guaranteed Wandering Master node on next run',
+  forbidden: '7th technique slot unlocked',
+  legend: '+15 max HP · enemy ATK +5% (challenge carries the name)',
+  feared: '+20% silver drops · enemy ATK +10%'
+};
+
+const SEAL_INFO = {
+  spared_iron_fan_widow: { icon: '🕊', name: 'The Widow Spared', bonus: 'Next life: +1 Technique Shard at start · Unlocks "A Familiar Face" event' },
+  entered_forbidden_cave: { icon: '🕳', name: "The Madman's Cave", bonus: 'Next life: Forbidden Cave accessible without orthodoxy penalty · Unlocks deeper technique' },
+  joined_black_cliff: { icon: '🏯', name: 'Black Cliff Manor', bonus: 'Next life: +30 starting silver · Black Cliff ally flag (enhanced Black Cliff events)' }
+};
+
 function getKarmaFlavour(karma, fateImprint) {
   if (fateImprint && IMPRINT_FLAVOUR[fateImprint]) return IMPRINT_FLAVOUR[fateImprint];
   const { mercy, honor, ambition, orthodoxy } = karma;
@@ -226,10 +244,40 @@ export default function LegacyScreen() {
               <div style={{ ...S.slotName, color: '#c88bcc' }}>
                 Fate Imprint: {metaState.fateImprint.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
               </div>
-              <div style={S.slotDesc}>This imprint carries into your next life</div>
+              <div style={S.slotDesc}>
+                Next life bonus — {IMPRINT_BONUSES[metaState.fateImprint] || 'This imprint carries into your next life'}
+              </div>
             </div>
           </div>
         )}
+
+        {(() => {
+          // Determine which seal this run will set (preview)
+          const flags = runState.run_flags || {};
+          const newSeal = flags.spared_iron_fan_widow ? 'spared_iron_fan_widow'
+            : flags.entered_forbidden_cave ? 'entered_forbidden_cave'
+            : flags.joined_black_cliff ? 'joined_black_cliff'
+            : metaState?.memorySeal; // carry forward if none earned this run
+          const sealInfo = newSeal ? SEAL_INFO[newSeal] : null;
+          if (!sealInfo) return (
+            <div style={{ ...S.inheritSlot(false), marginTop: '8px' }}>
+              <span style={S.slotIcon}>📌</span>
+              <div>
+                <div style={S.slotName}>Memory Seal: None</div>
+                <div style={S.slotDesc}>No major karmic choice sealed this life. Major choices (sparing enemies, entering forbidden places, joining factions) leave memory seals that carry mechanical bonuses into the next life.</div>
+              </div>
+            </div>
+          );
+          return (
+            <div style={{ ...S.inheritSlot(true), background: '#1a1a2e', border: '1px solid #4a4a8b66', marginTop: '8px' }}>
+              <span style={S.slotIcon}>{sealInfo.icon}</span>
+              <div>
+                <div style={{ ...S.slotName, color: '#b0b0ee' }}>Memory Seal: {sealInfo.name}</div>
+                <div style={S.slotDesc}>{sealInfo.bonus}</div>
+              </div>
+            </div>
+          );
+        })()}
 
         <div style={S.flavorText}>{getKarmaFlavour(runState.karma, metaState?.fateImprint)}</div>
       </div>

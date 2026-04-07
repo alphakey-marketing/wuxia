@@ -45,6 +45,7 @@ export const EVENTS = [
     description: 'A beggar in ragged clothes offers to share a "secret of the jianghu" in exchange for silver.',
     choices: [
       { text: 'Give 20 silver', outcome: { silver: -20, technique: 'T03', karma: { mercy: 1 } } },
+      { text: 'Your name alone is payment enough — they recognize you', outcome: { technique: 'T03', karma: { renown: 1 } }, karmaRequirement: { renown: 3 } },
       { text: 'Ignore him', outcome: {} },
       { text: 'Rob him', outcome: { silver: 5, karma: { mercy: -2, honor: -1 } } }
     ]
@@ -55,8 +56,9 @@ export const EVENTS = [
     description: 'A martial artist from your past blocks the road. "This path belongs to the Flying Hawk Sect," he warns.',
     choices: [
       { text: 'Push past them with force — no words needed', outcome: { karma: { ambition: 1 }, silver: 25 } },
-      { text: 'Find another way around (add Mercy)', outcome: { karma: { mercy: 1 } } },
-      { text: 'Challenge them to a formal duel', outcome: { karma: { honor: 1, renown: 1 }, technique: 'T05' } }
+      { text: 'Challenge them to a formal duel', outcome: { karma: { honor: 1, renown: 1 }, technique: 'T05' } },
+      { text: 'Your name makes them step aside — they dare not fight you', outcome: { karma: { renown: 1 }, silver: 15 }, karmaRequirement: { renown: 2 } },
+      { text: 'Find another way around (add Mercy)', outcome: { karma: { mercy: 1 } } }
     ]
   },
   {
@@ -64,7 +66,8 @@ export const EVENTS = [
     name: 'The Burning Village',
     description: 'A village is under attack by bandits. You can intervene or pass by.',
     choices: [
-      { text: 'Defend the village (+2 fights)', outcome: { karma: { mercy: 2, renown: 1 }, silver: 40, healHp: 20 } },
+      { text: 'Defend the village and drive off the bandits', outcome: { karma: { mercy: 2, renown: 1 }, silver: 40, healHp: 20 } },
+      { text: 'Rally the villagers behind your name — your renown does the work', outcome: { karma: { mercy: 1, renown: -1 }, silver: 25, healHp: 10 }, karmaRequirement: { renown: 2 } },
       { text: 'Pass by quietly', outcome: { karma: { mercy: -1 } } },
       { text: 'Loot the chaos', outcome: { silver: 60, karma: { mercy: -2, honor: -2 } } }
     ]
@@ -94,8 +97,9 @@ export const EVENTS = [
     name: 'The Condemned Prisoner',
     description: 'Constables are about to execute a prisoner who claims to be innocent.',
     choices: [
-      { text: 'Intervene (+1 combat vs. constables)', outcome: { karma: { mercy: 1, honor: 1 }, memorySeal: 'The Prisoner You Freed' } },
+      { text: 'Intervene — stand between the prisoner and the constables', outcome: { karma: { mercy: 1, honor: 1 }, memorySeal: 'The Prisoner You Freed' } },
       { text: 'Bribe the constables (−40 silver)', outcome: { silver: -40, karma: { mercy: 1 } } },
+      { text: 'Vouch for the prisoner by name — your reputation shields them', outcome: { karma: { mercy: 1, renown: -1 }, healHp: 15 }, karmaRequirement: { renown: 2 } },
       { text: 'Walk past', outcome: { karma: { mercy: -1 } } }
     ]
   },

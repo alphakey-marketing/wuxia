@@ -114,6 +114,7 @@ export default function BlackMarketScreen() {
   const { runState } = state;
   const [inventory] = useState(() => generateShopInventory(runState));
   const [purchased, setPurchased] = useState({});
+  const [upgradedTechs, setUpgradedTechs] = useState({});
 
   const handleBuy = (entry, idx) => {
     if (purchased[idx] || runState.silver < entry.cost) return;
@@ -121,9 +122,23 @@ export default function BlackMarketScreen() {
     setPurchased(prev => ({ ...prev, [idx]: true }));
   };
 
+  const handleUpgrade = (tech) => {
+    actions.upgradeTechniqueWithShard(tech.id);
+    setUpgradedTechs(prev => ({ ...prev, [tech.id]: (prev[tech.id] || 0) + 1 }));
+  };
+
   const handleLeave = () => {
     actions.leaveNode();
   };
+
+  // Techniques eligible for shard upgrade
+  const upgradableTechs = runState.techniques.filter(t => {
+    const appliedUpgrade = t.appliedUpgrade || 0;
+    if (appliedUpgrade >= 2) return false;
+    const nextUpgradeText = appliedUpgrade === 0 ? t.upgradeI : t.upgradeII;
+    return !!nextUpgradeText;
+  });
+  const hasShards = (runState.techniqueShards || 0) > 0;
 
   return (
     <div style={S.container}>
@@ -170,6 +185,84 @@ export default function BlackMarketScreen() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* ── Technique Forge ───────────────────────────────────────── */}
+      <div style={S.panel}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+          <div>
+            <div style={{ fontSize: '16px', color: '#e8c87e', letterSpacing: '0.1em' }}>⚒ 技藝淬煉 · Technique Forge</div>
+            <div style={{ fontSize: '11px', color: '#c8a96e66', marginTop: '2px' }}>Spend a Technique Shard to unlock an upgrade on an owned technique</div>
+          </div>
+          <div style={{ fontSize: '13px', color: (runState.techniqueShards || 0) > 0 ? '#e8c87e' : '#c8a96e44', background: '#2a1e10', padding: '4px 12px', borderRadius: '2px', border: '1px solid #c8a96e33' }}>
+            🔮 {runState.techniqueShards || 0} shard{(runState.techniqueShards || 0) !== 1 ? 's' : ''}
+          </div>
+        </div>
+        {upgradableTechs.length === 0 ? (
+          <div style={{ fontSize: '12px', color: '#c8a96e44', textAlign: 'center', padding: '12px' }}>
+            {runState.techniques.length === 0
+              ? 'No techniques to upgrade — acquire techniques first.'
+              : 'All owned techniques are already at maximum upgrade tier.'}
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {upgradableTechs.map(tech => {
+              const appliedUpgrade = (tech.appliedUpgrade || 0) + (upgradedTechs[tech.id] || 0);
+              const nextUpgradeText = appliedUpgrade === 0 ? tech.upgradeI : tech.upgradeII;
+              const tierLabel = appliedUpgrade === 0 ? 'Chapter I' : 'Chapter II';
+              const alreadyUpgraded = upgradedTechs[tech.id] > 0;
+              const canUpgrade = hasShards && !alreadyUpgraded && !!nextUpgradeText;
+              return (
+                <div key={tech.id} style={{
+                  padding: '14px',
+                  background: alreadyUpgraded ? '#1a2a1a' : '#2a1e10',
+                  border: `1px solid ${alreadyUpgraded ? '#4a8b4a55' : '#c8a96e33'}`,
+                  borderRadius: '2px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start'
+                }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '14px', color: '#e8c87e', marginBottom: '3px' }}>{tech.name}</div>
+                    <div style={{ fontSize: '11px', color: '#c8a96e66', marginBottom: '6px' }}>{tech.tags?.join(' · ')}</div>
+                    {nextUpgradeText && !alreadyUpgraded && (
+                      <div style={{ fontSize: '11px', color: '#88aacc', lineHeight: '1.5' }}>
+                        <span style={{ color: '#4a88cc88', marginRight: '4px' }}>{tierLabel}:</span>{nextUpgradeText}
+                      </div>
+                    )}
+                    {alreadyUpgraded && (
+                      <div style={{ fontSize: '11px', color: '#6abf6a' }}>✓ Upgrade applied this visit</div>
+                    )}
+                  </div>
+                  <button
+                    style={{
+                      marginLeft: '16px',
+                      padding: '8px 14px',
+                      background: alreadyUpgraded ? 'transparent' : canUpgrade ? '#1a2a3a' : '#1a1208',
+                      border: `1px solid ${alreadyUpgraded ? '#4a8b4a' : canUpgrade ? '#4a88cc' : '#c8a96e22'}`,
+                      color: alreadyUpgraded ? '#4a8b4a' : canUpgrade ? '#88aaee' : '#c8a96e33',
+                      fontFamily: 'serif',
+                      fontSize: '12px',
+                      cursor: canUpgrade ? 'pointer' : 'not-allowed',
+                      borderRadius: '2px',
+                      minWidth: '80px',
+                      whiteSpace: 'nowrap'
+                    }}
+                    onClick={() => canUpgrade && handleUpgrade(tech)}
+                    disabled={!canUpgrade}
+                  >
+                    {alreadyUpgraded ? '✓ Done' : hasShards ? '🔮 Upgrade' : 'No Shards'}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {!hasShards && upgradableTechs.length > 0 && (
+          <div style={{ fontSize: '11px', color: '#c8a96e44', marginTop: '10px', textAlign: 'center', fontStyle: 'italic' }}>
+            Acquire technique shards by choosing "Observe from afar" at Wandering Master encounters or teaching students at events.
+          </div>
+        )}
       </div>
 
       <button style={S.leaveBtn} onClick={handleLeave}>

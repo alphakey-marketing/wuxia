@@ -98,7 +98,9 @@ export default function EventScreen() {
     // Karma requirement can be inside outcome.requiresKarma (E_FORBIDDEN_CAVE)
     // or at top-level choice.karmaRequirement (E_SECT_TRIAL)
     const karmaReq = choice.outcome?.requiresKarma || choice.karmaRequirement;
-    if (karmaReq && runState?.karma) {
+    // Memory seal: seal_cave_mapped bypasses orthodoxy requirement on E_FORBIDDEN_CAVE
+    const sealBypassesCave = event.id === 'E_FORBIDDEN_CAVE' && runState?.run_flags?.seal_cave_mapped;
+    if (karmaReq && runState?.karma && !sealBypassesCave) {
       const meetsReq = Object.entries(karmaReq).every(
         ([axis, minVal]) => (runState.karma[axis] || 0) >= minVal
       );
@@ -121,7 +123,8 @@ export default function EventScreen() {
         <div style={S.choices}>
           {event.choices.map((choice, i) => {
             const karmaReq = choice.outcome?.requiresKarma || choice.karmaRequirement;
-            const meetsKarma = !karmaReq || !runState?.karma || Object.entries(karmaReq).every(
+            const sealBypass = event.id === 'E_FORBIDDEN_CAVE' && runState?.run_flags?.seal_cave_mapped;
+            const meetsKarma = !karmaReq || sealBypass || !runState?.karma || Object.entries(karmaReq).every(
               ([axis, minVal]) => (runState.karma[axis] || 0) >= minVal
             );
             const karmaHint = karmaReq && !meetsKarma
@@ -135,7 +138,11 @@ export default function EventScreen() {
                 onMouseLeave={e => { e.currentTarget.style.borderColor = karmaHint ? '#8b4a4a66' : '#c8a96e44'; e.currentTarget.style.background = '#2a1e10'; }}
                 onClick={() => handleChoice(choice)}
               >
-                <span>{choice.text}{karmaHint && <span style={{ fontSize: '10px', color: '#bf6a6a', marginLeft: '6px' }}>⚠ requires {karmaHint}</span>}</span>
+                <span>
+                  {choice.text}
+                  {karmaHint && <span style={{ fontSize: '10px', color: '#bf6a6a', marginLeft: '6px' }}>⚠ requires {karmaHint}</span>}
+                  {sealBypass && karmaReq && <span style={{ fontSize: '10px', color: '#8888cc', marginLeft: '6px' }}>📌 Memory Seal bypasses requirement</span>}
+                </span>
                 <span style={S.outcomePreview}>{formatOutcome(choice.outcome)}</span>
               </button>
 

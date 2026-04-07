@@ -161,6 +161,21 @@ function gameReducer(state, action) {
       if (imprint === 'feared') {
         runState.run_flags.feared_start = true;
       }
+      // ── Memory Seal effects ─────────────────────────────────────
+      // Each seal carries a distinct mechanical bonus from the choice made in the previous life.
+      const seal = state.metaState.memorySeal;
+      if (seal === 'spared_iron_fan_widow') {
+        // Showed mercy to the Iron Fan Widow → start with 1 extra technique shard
+        runState.techniqueShards = (runState.techniqueShards || 0) + 1;
+        runState.run_flags.seal_widow_spared = true;
+      } else if (seal === 'entered_forbidden_cave') {
+        // Ventured into the madman's cave → cave is mapped; can enter without orthodoxy penalty
+        runState.run_flags.seal_cave_mapped = true;
+      } else if (seal === 'joined_black_cliff') {
+        // Pledged to Black Cliff Manor → start with +30 silver and a Black Cliff contact flag
+        runState.silver += 30;
+        runState.run_flags.seal_black_cliff_ally = true;
+      }
       return { ...state, runState, gamePhase: 'nodeMap' };
     }
     case 'TRAVEL_TO_NODE': {
@@ -465,6 +480,36 @@ function gameReducer(state, action) {
       }
       return { ...state, runState: newRunState };
     }
+    case 'UPGRADE_TECHNIQUE_SHARD': {
+      // Spend 1 technique shard to upgrade a technique: base → upgradeI → upgradeII
+      const { techniqueId } = action.payload;
+      const shards = state.runState.techniqueShards || 0;
+      if (shards < 1) return state;
+      const techIdx = state.runState.techniques.findIndex(t => t.id === techniqueId);
+      if (techIdx === -1) return state;
+      const tech = state.runState.techniques[techIdx];
+      const currentUpgrade = tech.appliedUpgrade || 0; // 0 = base, 1 = upgradeI applied, 2 = upgradeII applied
+      if (currentUpgrade >= 2) return state; // already at max
+      const nextUpgrade = currentUpgrade + 1;
+      const upgradeDesc = nextUpgrade === 1 ? tech.upgradeI : tech.upgradeII;
+      if (!upgradeDesc) return state; // no upgrade defined
+      const upgradedTech = {
+        ...tech,
+        appliedUpgrade: nextUpgrade,
+        upgradeLabel: nextUpgrade === 1 ? 'Chapter I' : 'Chapter II',
+        description: `${tech.description} [${nextUpgrade === 1 ? 'I' : 'II'}: ${upgradeDesc}]`
+      };
+      const newTechniques = [...state.runState.techniques];
+      newTechniques[techIdx] = upgradedTech;
+      return {
+        ...state,
+        runState: {
+          ...state.runState,
+          techniques: newTechniques,
+          techniqueShards: shards - 1
+        }
+      };
+    }
     case 'SET_RUN_FLAG': {
       const newRunState = {
         ...state.runState,
@@ -599,6 +644,7 @@ export function GameProvider({ children }) {
     setRunFlag: (flag, value) => dispatch({ type: 'SET_RUN_FLAG', payload: { flag, value } }),
     chooseFork: (nodeIndex, branchIndex) => dispatch({ type: 'CHOOSE_FORK', payload: { nodeIndex, branchIndex } }),
     buyFromMarket: (item, cost, itemType) => dispatch({ type: 'BUY_FROM_MARKET', payload: { item, cost, itemType } }),
+    upgradeTechniqueWithShard: (techniqueId) => dispatch({ type: 'UPGRADE_TECHNIQUE_SHARD', payload: { techniqueId } }),
     updateHp: (hp) => dispatch({ type: 'UPDATE_HP', payload: hp }),
     updateQi: (qi) => dispatch({ type: 'UPDATE_QI', payload: qi })
   };

@@ -173,14 +173,20 @@ export default function BuildSummary() {
       </div>
 
       <div style={S.section}>
-        <div style={S.sectionTitle}>Techniques ({runState.techniques.length}/6)</div>
+        <div style={S.sectionTitle}>Techniques ({runState.techniques.length}/{runState.maxTechniques || 6})</div>
         {runState.techniques.length === 0 && <div style={S.itemSub}>None yet</div>}
         {runState.techniques.map(t => (
           <div key={t.id} style={{ marginBottom: '4px' }}>
             <span style={S.itemName}>{t.name}</span>
+            {t.upgradeLabel && <span style={{ fontSize: '9px', color: '#4a88cc', marginLeft: '4px', background: '#1a2a3a', padding: '1px 4px', borderRadius: '2px' }}>{t.upgradeLabel}</span>}
             <span style={{ marginLeft: '6px' }}>{t.tags.map(tag => <span key={tag} style={S.tag}>{tag}</span>)}</span>
           </div>
         ))}
+        {(runState.techniqueShards || 0) > 0 && (
+          <div style={{ marginTop: '6px', fontSize: '11px', color: '#88aacc', background: '#1a2030', padding: '4px 8px', borderRadius: '2px', display: 'inline-block' }}>
+            🔮 {runState.techniqueShards} shard{runState.techniqueShards !== 1 ? 's' : ''} — upgrade at the Black Market
+          </div>
+        )}
         {synergies.length > 0 && (
           <div style={{ marginTop: '8px' }}>
             <div style={S.sectionTitle}>Active Synergies</div>
